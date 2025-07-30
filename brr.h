@@ -158,14 +158,16 @@ extern brr_app _app;
 
 
 #ifdef BRR_IMPLEMENTATION
-#import <Cocoa/Cocoa.h>
+//todo Place?
+brr_app _app = {0, 0, 320, 200};
 
-brr_app _app = {NULL, NULL, 320, 200};
+#if defined(__APPLE__) && 0
+#import <Cocoa/Cocoa.h>
 
 static void init_keytable(void)
 {
     memset(_app.keycodes, -1, sizeof(_app.keycodes));
-    
+
     _app.keycodes[0x1D] = BRR_KEY_0;
     _app.keycodes[0x12] = BRR_KEY_1;
     _app.keycodes[0x13] = BRR_KEY_2;
@@ -434,5 +436,205 @@ void brr_start(void){
     [app run];
 }
 
+#elif defined(__linux__) || defined(__unix__) || 1
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <stdio.h>  // printf
+#include <stdint.h> // uint8_t, uint32_t
+#include <stdlib.h> // malloc, free
+#include <string.h> // memset
+#include <time.h> // clock_gettime, nanosleep
 
+// static int width = 1240;
+// static int height = 800;
+static int bpp = 4;
+static int fps = 30;
+
+typedef struct x11_state_desc{
+    int is_running;
+    XEvent event;
+    Display *display;
+    Window window;
+    Visual *visual;
+    GC gc;
+    int screen;
+    int depth;
+    Atom wm_delete_window;
+    uint8_t *data;
+    uint8_t *imgdata;
+    XImage *image;
+    uint64_t last_timestamp;
+    uint32_t lut_red[256];
+    uint32_t lut_green[256];
+    uint32_t lut_blue[256];
+} x11_state_desc;
+
+static x11_state_desc x11_state;
+
+int x11_get_shift_of_mask(unsigned long mask){
+    int shift = 0;
+    if (mask == 0) return shift;
+    while ((mask & 1) == 0 && shift < sizeof(unsigned long) * 8)
+    {
+        mask >>= 1;
+        shift++;
+    }
+    return shift;
+}
+
+void x11_create_lut(){
+    int red_shift = x11_get_shift_of_mask(x11_state.visual->red_mask);
+    int green_shift = x11_get_shift_of_mask(x11_state.visual->green_mask);
+    int blue_shift = x11_get_shift_of_mask(x11_state.visual->blue_mask);
+
+    for (int i = 0; i< 256; i++){
+        x11_state.lut_red[i] = i << red_shift;
+        x11_state.lut_green[i] = i << green_shift;
+        x11_state.lut_blue[i] = i << blue_shift;
+    }
+}
+
+void x11_swizzle_rgbx(){
+    uint8_t *from = x11_state.data;
+    uint32_t *to = (uint32_t *) x11_state.imgdata;
+    for (int i = 0; i < _app.width * _app.height; i += 1){
+        int idx = i * bpp;
+        to[i] = x11_state.lut_red[from[idx]] |
+            x11_state.lut_green[from[idx + 1]] |
+            x11_state.lut_blue[from[idx + 2]];
+    }
+}
+
+
+void x11_setup(){
+    memset(&x11_state, 0, sizeof(x11_state));
+
+    x11_state.display = XOpenDisplay(NULL);
+    if (!x11_state.display){
+        abort();
+    }
+    x11_state.screen = DefaultScreen(x11_state.display);
+    x11_state.depth =  DefaultDepth(x11_state.display, x11_state.screen);
+    x11_state.visual = DefaultVisual(x11_state.display, x11_state.screen);
+
+    Window root_window = XRootWindow(x11_state.display, x11_state.screen);
+    unsigned long attribmask = CWEventMask;
+    XSetWindowAttributes attribs;
+    attribs.event_mask = KeyPressMask| KeyReleaseMask | ExposureMask | StructureNotifyMask;
+    x11_state.window = XCreateWindow(x11_state.display, root_window, 0, 0, _app.width, _app.height, 0, x11_state.depth, InputOutput, x11_state.visual, attribmask, &attribs );
+    if (!x11_state.window){
+        abort();
+    }
+    XMapWindow(x11_state.display, x11_state.window);
+    x11_state.wm_delete_window = XInternAtom(x11_state.display, "WM_DELETE_WINDOW", False);
+    XSetWMProtocols(x11_state.display, x11_state.window, &x11_state.wm_delete_window, 1);
+
+    XGCValues xgcvalues;
+    int valuemask = GCGraphicsExposures;
+    xgcvalues.graphics_exposures = False;
+    x11_state.gc = XCreateGC(x11_state.display, x11_state.window, valuemask, &xgcvalues );
+}
+
+
+void x11_alloc_image(){
+    if (x11_state.image){
+        XDestroyImage(x11_state.image);
+        x11_state.image = NULL;
+        x11_state.imgdata = NULL;
+    }
+     if (x11_state.data){
+        free(x11_state.data);
+        x11_state.data = NULL;
+    }
+
+    x11_state.data = malloc(_app.width * _app.height * bpp);
+    x11_state.imgdata = malloc(_app.width * _app.height * bpp);
+    x11_state.image = XCreateImage(x11_state.display, x11_state.visual, x11_state.depth, ZPixmap, 0, x11_state.imgdata, _app.width, _app.height, 32, _app.width*bpp);
+}
+
+void x11_dealloc_image(){
+    XDestroyImage(x11_state.image);
+    free(x11_state.data);
+}
+
+void x11_fetch_events(){
+    while (XPending(x11_state.display)){
+        XNextEvent(x11_state.display, &x11_state.event);
+        if (x11_state.event.type == ClientMessage) {
+            if ((Atom)x11_state.event.xclient.data.l[0] == x11_state.wm_delete_window) {
+                    x11_state.is_running = 0;
+            }
+        }
+        if (x11_state.event.type == ConfigureNotify && (x11_state.event.xconfigure.width != _app.width || x11_state.event.xconfigure.height != _app.height) ){
+            _app.width = x11_state.event.xconfigure.width;
+            _app.height = x11_state.event.xconfigure.height;
+            x11_alloc_image();
+        }
+        printf("%d\n",x11_state.event.type);
+    }
+}
+
+
+void x11_wait_for_expose(){
+    int ok = 0;
+    while (!ok)
+    {
+        XNextEvent(x11_state.display, &x11_state.event);
+        if (x11_state.event.type == Expose && !x11_state.event.xexpose.count)
+        {
+            ok = 1;
+        }
+    }
+}
+
+uint64_t x11_get_time(){
+    struct timespec tspec;
+    clock_gettime( CLOCK_MONOTONIC, &tspec );
+    return (uint64_t)tspec.tv_sec*1000000000 + (uint64_t)tspec.tv_nsec;
+}
+
+void x11_framelock(){
+    uint64_t now = x11_get_time();
+    if (!x11_state.last_timestamp){
+        x11_state.last_timestamp = now;
+        return;
+    }
+    uint64_t elapsed = now - x11_state.last_timestamp;
+    uint64_t frame_duration_ns = 1000000000 / fps;
+    if (elapsed < frame_duration_ns) {
+        struct timespec req = {
+            .tv_sec = 0,
+            .tv_nsec = frame_duration_ns - elapsed
+        };
+        nanosleep(&req, NULL);
+    }
+    x11_state.last_timestamp = x11_get_time();
+}
+
+void brr_start(void){
+	x11_setup();
+    x11_create_lut();
+    x11_alloc_image();
+    x11_wait_for_expose();
+
+    x11_state.is_running = 1;
+    while (x11_state.is_running) {
+        x11_fetch_events();
+        if (_app.frame){
+        	_app.frame(x11_state.data, _app.width, _app.height);
+        }
+        x11_swizzle_rgbx();
+        XPutImage(x11_state.display, x11_state.window, x11_state.gc, x11_state.image,
+			0, 0,
+			0, 0,
+			_app.width, _app.height );
+        XFlush(x11_state.display);
+        x11_framelock();
+    }
+
+    x11_dealloc_image();
+    XFreeGC(x11_state.display, x11_state.gc);
+    XCloseDisplay(x11_state.display);
+}
+#endif
 #endif

@@ -1,11 +1,10 @@
 #ifndef BRR_INCL
 #define BRR_INCL
 #include "stdint.h"
+
 #define BYTES_PER_PIXEL 4
 #define FPS 30
 #define MAX_KEYCODES 512
-
-void brr_start(void);
 
 typedef enum brr_event_type{
     BRR_EV_KEYDOWN,
@@ -152,20 +151,28 @@ typedef struct brr_app_t {
     brr_keycode keycodes[MAX_KEYCODES];
 } brr_app_t;
 
-extern brr_app_t brr_app;
+void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event));
 #endif
 
 
 #ifdef BRR_IMPLEMENTATION
-//todo Place?
-brr_app_t brr_app = {0, 0, 320, 200};
+#include <stdio.h>  // printf
+#include <string.h> // memset
+brr_app_t brr_app;
 
-#if defined(__APPLE__) && 0
+static void init_brr_app(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
+    brr_app.width = initial_width;
+    brr_app.height = initial_height;
+    brr_app.frame = frame;
+    brr_app.event = event;
+    memset(brr_app.keycodes, -1, sizeof(brr_app.keycodes));
+}
+
+#if defined(__APPLE__) && 1
 #import <Cocoa/Cocoa.h>
 
 static void init_keytable(void)
 {
-    memset(brr_app.keycodes, -1, sizeof(brr_app.keycodes));
 
     brr_app.keycodes[0x1D] = BRR_KEY_0;
     brr_app.keycodes[0x12] = BRR_KEY_1;
@@ -426,7 +433,8 @@ static void init_keytable(void)
 }
 @end
 
-void brr_start(void){
+void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
+    init_brr_app(initial_width, initial_height, frame, event);
     init_keytable();
     NSApplication *app = [NSApplication sharedApplication];
     AppDelegate *delegate = [[AppDelegate alloc] init];
@@ -439,10 +447,8 @@ void brr_start(void){
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/XKBlib.h>
-#include <stdio.h>  // printf
 #include <stdint.h> // uint8_t, uint32_t
 #include <stdlib.h> // malloc, free
-#include <string.h> // memset
 #include <time.h> // clock_gettime, nanosleep
 
 typedef struct x11_state_t{
@@ -980,7 +986,8 @@ static void x11_init_keytable(void)
     XFree(keysyms);
 }
 
-void brr_start(void){
+void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
+    init_brr_app(initial_width, initial_height, frame, event);
 	x11_setup();
     x11_create_lut();
     x11_init_keytable();

@@ -1,6 +1,6 @@
 #ifndef BRR_INCL
 #define BRR_INCL
-#include "stdint.h"
+#include "stdint.h" // uint8_t, uint32_t
 
 #define BYTES_PER_PIXEL 4
 #define FPS 30
@@ -168,7 +168,7 @@ static void init_brr_app(int initial_width, int initial_height, void (*frame)(ui
     memset(brr_app.keycodes, -1, sizeof(brr_app.keycodes));
 }
 
-#if defined(__APPLE__) && 1
+#if defined(__APPLE__) && 0
 #import <Cocoa/Cocoa.h>
 
 static void init_keytable(void)
@@ -417,7 +417,7 @@ static void init_keytable(void)
     }
     size_t bitmapSize = sizeof(uint8_t) * brr_app.width * BYTES_PER_PIXEL * brr_app.height;
     buffer = malloc(bitmapSize);
-    contextRef = CGBitmapContextCreate(buffer, brr_app.width, brr_app.height, 8, brr_app.width * BYTES_PER_PIXEL, colorSpaceRef, kCGImageAlphaNoneSkipLast);
+    contextRef = CGBitmapContextCreate(buffer, brr_app.width, brr_app.height, 8, brr_app.width * BYTES_PER_PIXEL, colorSpaceRef, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little);
     [self setNeedsDisplay:YES];
 }
 
@@ -447,7 +447,6 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/XKBlib.h>
-#include <stdint.h> // uint8_t, uint32_t
 #include <stdlib.h> // malloc, free
 #include <time.h> // clock_gettime, nanosleep
 
@@ -461,7 +460,6 @@ typedef struct x11_state_t{
     int screen;
     int depth;
     Atom wm_delete_window;
-    uint8_t *data;
     uint8_t *imgdata;
     XImage *image;
     uint64_t last_timestamp;
@@ -492,17 +490,6 @@ static void x11_create_lut(){
         x11_state.lut_red[i] = i << red_shift;
         x11_state.lut_green[i] = i << green_shift;
         x11_state.lut_blue[i] = i << blue_shift;
-    }
-}
-
-static void x11_swizzle_rgbx(){
-    uint8_t *from = x11_state.data;
-    uint32_t *to = (uint32_t *) x11_state.imgdata;
-    for (int i = 0; i < brr_app.width * brr_app.height; i += 1){
-        int idx = i * BYTES_PER_PIXEL;
-        to[i] = x11_state.lut_red[from[idx]] |
-            x11_state.lut_green[from[idx + 1]] |
-            x11_state.lut_blue[from[idx + 2]];
     }
 }
 
@@ -541,19 +528,13 @@ static void x11_alloc_image(){
         x11_state.image = NULL;
         x11_state.imgdata = NULL;
     }
-     if (x11_state.data){
-        free(x11_state.data);
-        x11_state.data = NULL;
-    }
 
-    x11_state.data = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
     x11_state.imgdata = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
     x11_state.image = XCreateImage(x11_state.display, x11_state.visual, x11_state.depth, ZPixmap, 0, x11_state.imgdata, brr_app.width, brr_app.height, 32, brr_app.width * BYTES_PER_PIXEL);
 }
 
 static void x11_dealloc_image(){
     XDestroyImage(x11_state.image);
-    free(x11_state.data);
 }
 
 static void x11_fetch_events(){
@@ -998,9 +979,8 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
     while (x11_state.is_running) {
         x11_fetch_events();
         if (brr_app.frame){
-        	brr_app.frame(x11_state.data, brr_app.width, brr_app.height);
+        	brr_app.frame(x11_state.imgdata, brr_app.width, brr_app.height);
         }
-        x11_swizzle_rgbx();
         XPutImage(x11_state.display, x11_state.window, x11_state.gc, x11_state.image,
 			0, 0,
 			0, 0,

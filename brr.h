@@ -443,6 +443,7 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
     [app run];
 }
 
+// --------------------------------------------------------------------------------
 #elif defined(__linux__) || defined(__unix__) || 1
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -463,9 +464,6 @@ typedef struct x11_state_t{
     uint8_t *imgdata;
     XImage *image;
     uint64_t last_timestamp;
-    uint32_t lut_red[256];
-    uint32_t lut_green[256];
-    uint32_t lut_blue[256];
 } x11_state_t;
 
 static x11_state_t x11_state;
@@ -479,18 +477,6 @@ static int x11_get_shift_of_mask(unsigned long mask){
         shift++;
     }
     return shift;
-}
-
-static void x11_create_lut(){
-    int red_shift = x11_get_shift_of_mask(x11_state.visual->red_mask);
-    int green_shift = x11_get_shift_of_mask(x11_state.visual->green_mask);
-    int blue_shift = x11_get_shift_of_mask(x11_state.visual->blue_mask);
-
-    for (int i = 0; i< 256; i++){
-        x11_state.lut_red[i] = i << red_shift;
-        x11_state.lut_green[i] = i << green_shift;
-        x11_state.lut_blue[i] = i << blue_shift;
-    }
 }
 
 static void x11_setup(){
@@ -576,7 +562,7 @@ static void x11_wait_for_expose(){
 static uint64_t x11_get_time(){
     struct timespec tspec;
     clock_gettime( CLOCK_MONOTONIC, &tspec );
-    return (uint64_t)tspec.tv_sec*1000000000 + (uint64_t)tspec.tv_nsec;
+    return (uint64_t)tspec.tv_sec * 1000000000 + (uint64_t)tspec.tv_nsec;
 }
 
 void x11_framelock(){
@@ -970,7 +956,6 @@ static void x11_init_keytable(void)
 void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
     init_brr_app(initial_width, initial_height, frame, event);
 	x11_setup();
-    x11_create_lut();
     x11_init_keytable();
     x11_alloc_image();
     x11_wait_for_expose();

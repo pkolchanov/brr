@@ -1015,6 +1015,133 @@ static void windows_set_dimensions(int width, int height){
     windows_realloc_buffer();
 }
 
+// glfw/src/win32_init.c
+static void windows_init_keytable(void){
+    memset(brr_app.keycodes, -1, sizeof(brr_app.keycodes));
+
+    brr_app.keycodes[0x00B] = BRR_KEY_0;
+    brr_app.keycodes[0x002] = BRR_KEY_1;
+    brr_app.keycodes[0x003] = BRR_KEY_2;
+    brr_app.keycodes[0x004] = BRR_KEY_3;
+    brr_app.keycodes[0x005] = BRR_KEY_4;
+    brr_app.keycodes[0x006] = BRR_KEY_5;
+    brr_app.keycodes[0x007] = BRR_KEY_6;
+    brr_app.keycodes[0x008] = BRR_KEY_7;
+    brr_app.keycodes[0x009] = BRR_KEY_8;
+    brr_app.keycodes[0x00A] = BRR_KEY_9;
+    brr_app.keycodes[0x01E] = BRR_KEY_A;
+    brr_app.keycodes[0x030] = BRR_KEY_B;
+    brr_app.keycodes[0x02E] = BRR_KEY_C;
+    brr_app.keycodes[0x020] = BRR_KEY_D;
+    brr_app.keycodes[0x012] = BRR_KEY_E;
+    brr_app.keycodes[0x021] = BRR_KEY_F;
+    brr_app.keycodes[0x022] = BRR_KEY_G;
+    brr_app.keycodes[0x023] = BRR_KEY_H;
+    brr_app.keycodes[0x017] = BRR_KEY_I;
+    brr_app.keycodes[0x024] = BRR_KEY_J;
+    brr_app.keycodes[0x025] = BRR_KEY_K;
+    brr_app.keycodes[0x026] = BRR_KEY_L;
+    brr_app.keycodes[0x032] = BRR_KEY_M;
+    brr_app.keycodes[0x031] = BRR_KEY_N;
+    brr_app.keycodes[0x018] = BRR_KEY_O;
+    brr_app.keycodes[0x019] = BRR_KEY_P;
+    brr_app.keycodes[0x010] = BRR_KEY_Q;
+    brr_app.keycodes[0x013] = BRR_KEY_R;
+    brr_app.keycodes[0x01F] = BRR_KEY_S;
+    brr_app.keycodes[0x014] = BRR_KEY_T;
+    brr_app.keycodes[0x016] = BRR_KEY_U;
+    brr_app.keycodes[0x02F] = BRR_KEY_V;
+    brr_app.keycodes[0x011] = BRR_KEY_W;
+    brr_app.keycodes[0x02D] = BRR_KEY_X;
+    brr_app.keycodes[0x015] = BRR_KEY_Y;
+    brr_app.keycodes[0x02C] = BRR_KEY_Z;
+
+    brr_app.keycodes[0x028] = BRR_KEY_APOSTROPHE;
+    brr_app.keycodes[0x02B] = BRR_KEY_BACKSLASH;
+    brr_app.keycodes[0x033] = BRR_KEY_COMMA;
+    brr_app.keycodes[0x00D] = BRR_KEY_EQUAL;
+    brr_app.keycodes[0x029] = BRR_KEY_GRAVE_ACCENT;
+    brr_app.keycodes[0x01A] = BRR_KEY_LEFT_BRACKET;
+    brr_app.keycodes[0x00C] = BRR_KEY_MINUS;
+    brr_app.keycodes[0x034] = BRR_KEY_PERIOD;
+    brr_app.keycodes[0x01B] = BRR_KEY_RIGHT_BRACKET;
+    brr_app.keycodes[0x027] = BRR_KEY_SEMICOLON;
+    brr_app.keycodes[0x035] = BRR_KEY_SLASH;
+    brr_app.keycodes[0x056] = BRR_KEY_WORLD_2;
+
+    brr_app.keycodes[0x00E] = BRR_KEY_BACKSPACE;
+    brr_app.keycodes[0x153] = BRR_KEY_DELETE;
+    brr_app.keycodes[0x14F] = BRR_KEY_END;
+    brr_app.keycodes[0x01C] = BRR_KEY_ENTER;
+    brr_app.keycodes[0x001] = BRR_KEY_ESCAPE;
+    brr_app.keycodes[0x147] = BRR_KEY_HOME;
+    brr_app.keycodes[0x152] = BRR_KEY_INSERT;
+    brr_app.keycodes[0x15D] = BRR_KEY_MENU;
+    brr_app.keycodes[0x151] = BRR_KEY_PAGE_DOWN;
+    brr_app.keycodes[0x149] = BRR_KEY_PAGE_UP;
+    brr_app.keycodes[0x045] = BRR_KEY_PAUSE;
+    brr_app.keycodes[0x039] = BRR_KEY_SPACE;
+    brr_app.keycodes[0x00F] = BRR_KEY_TAB;
+    brr_app.keycodes[0x03A] = BRR_KEY_CAPS_LOCK;
+    brr_app.keycodes[0x145] = BRR_KEY_NUM_LOCK;
+    brr_app.keycodes[0x046] = BRR_KEY_SCROLL_LOCK;
+    brr_app.keycodes[0x03B] = BRR_KEY_F1;
+    brr_app.keycodes[0x03C] = BRR_KEY_F2;
+    brr_app.keycodes[0x03D] = BRR_KEY_F3;
+    brr_app.keycodes[0x03E] = BRR_KEY_F4;
+    brr_app.keycodes[0x03F] = BRR_KEY_F5;
+    brr_app.keycodes[0x040] = BRR_KEY_F6;
+    brr_app.keycodes[0x041] = BRR_KEY_F7;
+    brr_app.keycodes[0x042] = BRR_KEY_F8;
+    brr_app.keycodes[0x043] = BRR_KEY_F9;
+    brr_app.keycodes[0x044] = BRR_KEY_F10;
+    brr_app.keycodes[0x057] = BRR_KEY_F11;
+    brr_app.keycodes[0x058] = BRR_KEY_F12;
+    brr_app.keycodes[0x064] = BRR_KEY_F13;
+    brr_app.keycodes[0x065] = BRR_KEY_F14;
+    brr_app.keycodes[0x066] = BRR_KEY_F15;
+    brr_app.keycodes[0x067] = BRR_KEY_F16;
+    brr_app.keycodes[0x068] = BRR_KEY_F17;
+    brr_app.keycodes[0x069] = BRR_KEY_F18;
+    brr_app.keycodes[0x06A] = BRR_KEY_F19;
+    brr_app.keycodes[0x06B] = BRR_KEY_F20;
+    brr_app.keycodes[0x06C] = BRR_KEY_F21;
+    brr_app.keycodes[0x06D] = BRR_KEY_F22;
+    brr_app.keycodes[0x06E] = BRR_KEY_F23;
+    brr_app.keycodes[0x076] = BRR_KEY_F24;
+    brr_app.keycodes[0x038] = BRR_KEY_LEFT_ALT;
+    brr_app.keycodes[0x01D] = BRR_KEY_LEFT_CONTROL;
+    brr_app.keycodes[0x02A] = BRR_KEY_LEFT_SHIFT;
+    brr_app.keycodes[0x15B] = BRR_KEY_LEFT_SUPER;
+    brr_app.keycodes[0x137] = BRR_KEY_PRINT_SCREEN;
+    brr_app.keycodes[0x138] = BRR_KEY_RIGHT_ALT;
+    brr_app.keycodes[0x11D] = BRR_KEY_RIGHT_CONTROL;
+    brr_app.keycodes[0x036] = BRR_KEY_RIGHT_SHIFT;
+    brr_app.keycodes[0x15C] = BRR_KEY_RIGHT_SUPER;
+    brr_app.keycodes[0x150] = BRR_KEY_DOWN;
+    brr_app.keycodes[0x14B] = BRR_KEY_LEFT;
+    brr_app.keycodes[0x14D] = BRR_KEY_RIGHT;
+    brr_app.keycodes[0x148] = BRR_KEY_UP;
+
+    brr_app.keycodes[0x052] = BRR_KEY_KP_0;
+    brr_app.keycodes[0x04F] = BRR_KEY_KP_1;
+    brr_app.keycodes[0x050] = BRR_KEY_KP_2;
+    brr_app.keycodes[0x051] = BRR_KEY_KP_3;
+    brr_app.keycodes[0x04B] = BRR_KEY_KP_4;
+    brr_app.keycodes[0x04C] = BRR_KEY_KP_5;
+    brr_app.keycodes[0x04D] = BRR_KEY_KP_6;
+    brr_app.keycodes[0x047] = BRR_KEY_KP_7;
+    brr_app.keycodes[0x048] = BRR_KEY_KP_8;
+    brr_app.keycodes[0x049] = BRR_KEY_KP_9;
+    brr_app.keycodes[0x04E] = BRR_KEY_KP_ADD;
+    brr_app.keycodes[0x053] = BRR_KEY_KP_DECIMAL;
+    brr_app.keycodes[0x135] = BRR_KEY_KP_DIVIDE;
+    brr_app.keycodes[0x11C] = BRR_KEY_KP_ENTER;
+    brr_app.keycodes[0x059] = BRR_KEY_KP_EQUAL;
+    brr_app.keycodes[0x037] = BRR_KEY_KP_MULTIPLY;
+    brr_app.keycodes[0x04A] = BRR_KEY_KP_SUBTRACT;
+}
+
 static void windows_setup(){
     memset(&windows_state, 0, sizeof(windows_state));
     windows_state.bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -1054,10 +1181,19 @@ LRESULT CALLBACK windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         return 0;
     case WM_KEYDOWN:
     case WM_KEYUP:
-        WORD vkCode = LOWORD(wParam);
+    case WM_SYSKEYUP:
+    case WM_SYSKEYDOWN:
         WORD keyFlags = HIWORD(lParam);
+        int scancode = (keyFlags & (KF_EXTENDED | 0xff));
         BOOL isKeyReleased = (keyFlags & KF_UP) == KF_UP;
-        printf("Key %d", vkCode);
+       
+        if (brr_app.event){
+            brr_event event;
+            event.event_type = isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN;
+            event.keycode = brr_app.keycodes[scancode];
+            printf("event");
+            brr_app.event(event);
+        }
         return 0;
     default:
         break;
@@ -1109,6 +1245,7 @@ void windows_framelock(){
 }
 
 static void windows_main(){
+    windows_init_keytable();
     windows_setup();
     windows_create_window();
     windows_state.is_running = 1;

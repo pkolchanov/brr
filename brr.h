@@ -444,7 +444,7 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
 }
 
 // --------------------------------------------------------------------------------
-#elif defined(__linux__) || defined(__unix__) || 1
+#elif defined(__linux__) || defined(__unix__) || 0
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/XKBlib.h>
@@ -978,5 +978,170 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
     XFreeGC(x11_state.display, x11_state.gc);
     XCloseDisplay(x11_state.display);
 }
+
+// --------------------------------------------------------------------------------
+#elif defined(_WIN32) || 1
+#include <windows.h>
+
+typedef struct windows_state_t
+{
+    int is_running;
+    uint8_t *buffer;
+    HWND window;
+    BITMAPINFO bitmapinfo;
+    LARGE_INTEGER freq;
+    LARGE_INTEGER last_timestamp;
+} windows_state_t;
+
+static windows_state_t windows_state;
+
+static void windows_free_buffer(){
+     if (windows_state.buffer){
+        free(windows_state.buffer);
+        windows_state.buffer = NULL;
+    }
+}
+
+static void windows_realloc_buffer(){
+    windows_free_buffer();
+    windows_state.buffer = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
+}
+
+static void windows_set_dimensions(int width, int height){
+    brr_app.width = width;
+    brr_app.height = height;
+    windows_state.bitmapinfo.bmiHeader.biWidth = width;
+    windows_state.bitmapinfo.bmiHeader.biHeight = height;
+    windows_realloc_buffer();
+}
+
+static void windows_setup(){
+    memset(&windows_state, 0, sizeof(windows_state));
+    windows_state.bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    windows_state.bitmapinfo.bmiHeader.biBitCount = 32;
+    windows_state.bitmapinfo.bmiHeader.biPlanes = 1;
+    windows_state.bitmapinfo.bmiHeader.biCompression = BI_RGB;
+    windows_set_dimensions(brr_app.width, brr_app.height);
+    QueryPerformanceFrequency(&windows_state.freq);
+}
+
+LRESULT CALLBACK windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg)
+    {
+    case WM_PAINT:
+        PAINTSTRUCT ps;
+        HDC device_context = BeginPaint(hwnd, &ps);
+        StretchDIBits(
+                device_context,
+                0, 0, brr_app.width, brr_app.height,
+                0, 0, brr_app.width, brr_app.height,
+                windows_state.buffer,
+                &windows_state.bitmapinfo,
+                DIB_RGB_COLORS,
+                SRCCOPY
+        );
+        EndPaint(hwnd, &ps);
+        return 0;
+    case WM_SIZE:
+        UINT width = LOWORD(lParam);
+        UINT height = HIWORD(lParam);
+        if (width != brr_app.width || height != brr_app.height){
+            windows_set_dimensions(width, height);
+        }
+        return 0;
+    case WM_CLOSE:
+        windows_state.is_running = 0;
+        return 0;
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+        WORD vkCode = LOWORD(wParam);
+        WORD keyFlags = HIWORD(lParam);
+        BOOL isKeyReleased = (keyFlags & KF_UP) == KF_UP;
+        printf("Key %d", vkCode);
+        return 0;
+    default:
+        break;
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+static void windows_create_window(){
+    const char CLASS_NAME[] = "BRRWINDOWCLASS";
+
+    WNDCLASS wc;
+    memset(&wc, 0, sizeof(wc));
+    wc.lpfnWndProc = windows_winproc;
+    wc.hInstance = GetModuleHandle(NULL);
+    wc.lpszClassName = CLASS_NAME;
+
+    RegisterClass(&wc); 
+    windows_state.window = CreateWindowEx(
+        0,
+        CLASS_NAME,
+        "Brr",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, brr_app.width, brr_app.height,
+        NULL, NULL, GetModuleHandle(NULL), NULL
+    );
+
+    if (!windows_state.window) return;
+    ShowWindow(windows_state.window, SW_SHOW);
+}
+
+static void windows_destroy_window(){
+    DestroyWindow(windows_state.window); windows_state.window = 0;
+    UnregisterClass("BRRWINDOWCLASS", GetModuleHandleW(NULL));
+}
+
+void windows_framelock(){
+    LARGE_INTEGER now;
+    QueryPerformanceCounter(&now);
+    if (windows_state.last_timestamp.QuadPart == 0){
+        windows_state.last_timestamp = now;
+        return;
+    }
+    double elapsed = (double)(now.QuadPart - windows_state.last_timestamp.QuadPart) / windows_state.freq.QuadPart;
+    double frame_duration = 1.0 / FPS;
+    if (elapsed < frame_duration) {
+        Sleep((frame_duration - elapsed) * 1000);
+    }
+    QueryPerformanceCounter(&windows_state.last_timestamp);
+}
+
+static void windows_main(){
+    windows_setup();
+    windows_create_window();
+    windows_state.is_running = 1;
+
+    while (windows_state.is_running)
+    {
+        MSG msg;
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
+            if (msg.message == WM_QUIT){
+                windows_state.is_running = 0;
+            }
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        
+        if (brr_app.frame){
+            brr_app.frame(windows_state.buffer, brr_app.width, brr_app.height);
+        }
+
+        InvalidateRect(windows_state.window, NULL, FALSE);
+        UpdateWindow(windows_state.window); 
+
+        windows_framelock();
+    }
+
+    windows_destroy_window();
+    windows_free_buffer();
+}   
+
+void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
+    init_brr_app(initial_width, initial_height, frame, event);
+	windows_main();
+}
+
 #endif
 #endif

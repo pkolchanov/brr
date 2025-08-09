@@ -168,7 +168,7 @@ static void init_brr_app(int initial_width, int initial_height, void (*frame)(ui
     memset(brr_app.keycodes, -1, sizeof(brr_app.keycodes));
 }
 
-#if defined(__APPLE__) && 0
+#if defined(__APPLE__) && 1
 #import <Cocoa/Cocoa.h>
 
 static void init_keytable(void)
@@ -302,6 +302,7 @@ static void init_keytable(void)
     CGColorSpaceRef colorSpaceRef;
     uint8_t *buffer;
 }
+@property (strong) NSTimer *timer;
 @end
 
 @implementation AppDelegate
@@ -318,27 +319,15 @@ static void init_keytable(void)
     [window setContentView:view];
     [window setTitle:@"BRR"];
     [window makeKeyAndOrderFront:nil];
-    // todo CADisplayLink or CVDisplayLink
-    [NSTimer scheduledTimerWithTimeInterval: 1.0/FPS
-                          target: self
-                          selector:@selector(onTick:)
-                          userInfo: nil repeats:YES];
 }
-
--(void)onTick:(NSTimer *)timer {
-    [[window contentView] setNeedsDisplay:YES];
-}
-
-
-- (void)applicationWillTerminate:(NSNotification *)aNotification {
-    // Insert code here to tear down your application
-}
-
 
 - (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app {
     return YES;
 }
 
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
+    return YES;
+}
 @end
 
 @implementation BRRView
@@ -347,10 +336,18 @@ static void init_keytable(void)
     self = [super init];
     if (self) {
         colorSpaceRef = CGColorSpaceCreateDeviceRGB();
+        // todo CADisplayLink or CVDisplayLink
+        _timer = [NSTimer scheduledTimerWithTimeInterval: 1.0/FPS
+                        target: self
+                        selector:@selector(onTick:)
+                        userInfo: nil repeats:YES];
     }
     return self;
 }
 
+-(void)onTick:(NSTimer *)timer {
+    [self setNeedsDisplay:YES];
+}
 
 - (void)keyDown:(NSEvent *)event{
     if (brr_app.event){
@@ -423,6 +420,7 @@ static void init_keytable(void)
 
 - (void)dealloc
 {
+    [[self timer] invalidate];
     CGColorSpaceRelease(colorSpaceRef);
     CGContextRelease(contextRef);
     free(buffer);

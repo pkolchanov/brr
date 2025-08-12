@@ -168,7 +168,7 @@ static void init_brr_app(int initial_width, int initial_height, void (*frame)(ui
     memset(brr_app.keycodes, BRR_KEY_UNKNOWN, sizeof(brr_app.keycodes));
 }
 
-#if defined(__APPLE__) && 1
+#if defined(__APPLE__) && 0
 #import <Cocoa/Cocoa.h>
 
 static void init_keytable(void)
@@ -290,12 +290,12 @@ static void init_keytable(void)
 }
 
 
-@interface AppDelegate : NSObject <NSApplicationDelegate>{
+@interface BrrAppDelegate : NSObject <NSApplicationDelegate>{
     NSWindow *window;
 }
 @end
 
-@interface BRRView : NSView{
+@interface BrrView : NSView{
     NSEventModifierFlags oldFlags;
     CGContextRef contextRef;
     CGColorSpaceRef colorSpaceRef;
@@ -304,7 +304,7 @@ static void init_keytable(void)
 @property (strong) NSTimer *timer;
 @end
 
-@implementation AppDelegate
+@implementation BrrAppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
     window = [[NSWindow alloc] initWithContentRect:NSMakeRect(100, 100, brr_app.width, brr_app.height)
@@ -314,7 +314,7 @@ static void init_keytable(void)
                                            backing:NSBackingStoreBuffered
                                              defer:NO];
 
-    BRRView *view = [[BRRView alloc] init];
+    BrrView *view = [[BrrView alloc] init];
     [window setContentView:view];
     [window setTitle:@"BRR"];
     [window makeKeyAndOrderFront:nil];
@@ -329,7 +329,7 @@ static void init_keytable(void)
 }
 @end
 
-@implementation BRRView
+@implementation BrrView
 - (instancetype)init
 {
     self = [super init];
@@ -434,21 +434,21 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
     init_brr_app(initial_width, initial_height, frame, event);
     init_keytable();
     NSApplication *app = [NSApplication sharedApplication];
-    AppDelegate *delegate = [[AppDelegate alloc] init];
+    BrrAppDelegate *delegate = [[BrrAppDelegate alloc] init];
     [app setDelegate:delegate];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     [app run];
 }
 
 // --------------------------------------------------------------------------------
-#elif defined(__linux__) || defined(__unix__) || 0
+#elif defined(__linux__) || defined(__unix__) || 1
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/XKBlib.h>
 #include <stdlib.h> // malloc, free
 #include <time.h> // clock_gettime, nanosleep
 
-typedef struct x11_state_t{
+typedef struct brr_x11_state_t{
     int is_running;
     XEvent event;
     Display *display;
@@ -461,107 +461,106 @@ typedef struct x11_state_t{
     uint8_t *imgdata;
     XImage *image;
     uint64_t last_timestamp;
-} x11_state_t;
+} brr_x11_state_t;
 
-static x11_state_t x11_state;
+static brr_x11_state_t brr_x11_state;
 
+static void brr_x11_setup(){
+    memset(&brr_x11_state, 0, sizeof(brr_x11_state));
 
-static void x11_setup(){
-    memset(&x11_state, 0, sizeof(x11_state));
-
-    x11_state.display = XOpenDisplay(NULL);
-    if (!x11_state.display){
+    brr_x11_state.display = XOpenDisplay(NULL);
+    if (!brr_x11_state.display){
         abort();
     }
-    x11_state.screen = DefaultScreen(x11_state.display);
-    x11_state.depth =  DefaultDepth(x11_state.display, x11_state.screen);
-    x11_state.visual = DefaultVisual(x11_state.display, x11_state.screen);
-    if (x11_state.depth < 24) {
+    brr_x11_state.screen = DefaultScreen(brr_x11_state.display);
+    brr_x11_state.depth =  DefaultDepth(brr_x11_state.display, brr_x11_state.screen);
+    brr_x11_state.visual = DefaultVisual(brr_x11_state.display, brr_x11_state.screen);
+    if (brr_x11_state.depth < 24) {
         abort(); 
     }
 
-    Window root_window = XRootWindow(x11_state.display, x11_state.screen);
+    Window root_window = XRootWindow(brr_x11_state.display, brr_x11_state.screen);
     unsigned long attribmask = CWEventMask;
     XSetWindowAttributes attribs;
     attribs.event_mask = KeyPressMask| KeyReleaseMask | ExposureMask | StructureNotifyMask;
-    x11_state.window = XCreateWindow(x11_state.display, root_window, 0, 0, brr_app.width, brr_app.height, 0, x11_state.depth, InputOutput, x11_state.visual, attribmask, &attribs );
-    if (!x11_state.window){
+    brr_x11_state.window = XCreateWindow(brr_x11_state.display, root_window, 0, 0, brr_app.width, brr_app.height, 0, brr_x11_state.depth, InputOutput, brr_x11_state.visual, attribmask, &attribs );
+    if (!brr_x11_state.window){
         abort();
     }
-    XMapWindow(x11_state.display, x11_state.window);
-    x11_state.wm_delete_window = XInternAtom(x11_state.display, "WM_DELETE_WINDOW", False);
-    XSetWMProtocols(x11_state.display, x11_state.window, &x11_state.wm_delete_window, 1);
+    XMapWindow(brr_x11_state.display, brr_x11_state.window);
+    brr_x11_state.wm_delete_window = XInternAtom(brr_x11_state.display, "WM_DELETE_WINDOW", False);
+    XSetWMProtocols(brr_x11_state.display, brr_x11_state.window, &brr_x11_state.wm_delete_window, 1);
 
     XGCValues xgcvalues;
     int valuemask = GCGraphicsExposures;
     xgcvalues.graphics_exposures = False;
-    x11_state.gc = XCreateGC(x11_state.display, x11_state.window, valuemask, &xgcvalues );
+    brr_x11_state.gc = XCreateGC(brr_x11_state.display, brr_x11_state.window, valuemask, &xgcvalues );
 }
 
-static void x11_alloc_image(){
-    if (x11_state.image){
-        XDestroyImage(x11_state.image);
-        x11_state.image = NULL;
-        x11_state.imgdata = NULL;
+static void brr_x11_alloc_image(){
+    if (brr_x11_state.image){
+        XDestroyImage(brr_x11_state.image);
+        brr_x11_state.image = NULL;
+        brr_x11_state.imgdata = NULL;
     }
 
-    x11_state.imgdata = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
-    x11_state.image = XCreateImage(x11_state.display, x11_state.visual, x11_state.depth, ZPixmap, 0, x11_state.imgdata, brr_app.width, brr_app.height, 32, brr_app.width * BYTES_PER_PIXEL);
+    brr_x11_state.imgdata = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
+    brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, brr_x11_state.imgdata, brr_app.width, brr_app.height, 32, brr_app.width * BYTES_PER_PIXEL);
 }
 
-static void x11_dealloc_image(){
-    XDestroyImage(x11_state.image);
+static void brr_x11_dealloc_image(){
+    XDestroyImage(brr_x11_state.image);
 }
 
-static void x11_fetch_events(){
-    while (XPending(x11_state.display)){
-        XNextEvent(x11_state.display, &x11_state.event);
-        if (x11_state.event.type == ClientMessage) {
-            if ((Atom)x11_state.event.xclient.data.l[0] == x11_state.wm_delete_window) {
-                    x11_state.is_running = 0;
+static void brr_x11_fetch_events(){
+    while (XPending(brr_x11_state.display)){
+        XNextEvent(brr_x11_state.display, &brr_x11_state.event);
+        if (brr_x11_state.event.type == ClientMessage) {
+            if ((Atom)brr_x11_state.event.xclient.data.l[0] == brr_x11_state.wm_delete_window) {
+                    brr_x11_state.is_running = 0;
             }
         }
-        if (x11_state.event.type == ConfigureNotify && (x11_state.event.xconfigure.width != brr_app.width || x11_state.event.xconfigure.height != brr_app.height) ){
-            brr_app.width = x11_state.event.xconfigure.width;
-            brr_app.height = x11_state.event.xconfigure.height;
-            x11_alloc_image();
+        if (brr_x11_state.event.type == ConfigureNotify && (brr_x11_state.event.xconfigure.width != brr_app.width || brr_x11_state.event.xconfigure.height != brr_app.height) ){
+            brr_app.width = brr_x11_state.event.xconfigure.width;
+            brr_app.height = brr_x11_state.event.xconfigure.height;
+            brr_x11_alloc_image();
         }
-        if (x11_state.event.type == KeyPress || x11_state.event.type == KeyRelease) {
+        if (brr_x11_state.event.type == KeyPress || brr_x11_state.event.type == KeyRelease) {
             if (brr_app.event){
                 brr_event event;
-                event.event_type = x11_state.event.type == KeyPress ? BRR_EV_KEYDOWN : BRR_EV_KEYUP;
-                event.keycode = brr_app.keycodes[x11_state.event.xkey.keycode];
+                event.event_type = brr_x11_state.event.type == KeyPress ? BRR_EV_KEYDOWN : BRR_EV_KEYUP;
+                event.keycode = brr_app.keycodes[brr_x11_state.event.xkey.keycode];
                 brr_app.event(event);
             }
         }
     }
 }
 
-static void x11_wait_for_expose(){
+static void brr_x11_wait_for_expose(){
     int ok = 0;
     while (!ok)
     {
-        XNextEvent(x11_state.display, &x11_state.event);
-        if (x11_state.event.type == Expose && !x11_state.event.xexpose.count)
+        XNextEvent(brr_x11_state.display, &brr_x11_state.event);
+        if (brr_x11_state.event.type == Expose && !brr_x11_state.event.xexpose.count)
         {
             ok = 1;
         }
     }
 }
 
-static uint64_t x11_get_time(){
+static uint64_t brr_x11_get_time(){
     struct timespec tspec;
     clock_gettime( CLOCK_MONOTONIC, &tspec );
     return (uint64_t)tspec.tv_sec * 1000000000 + (uint64_t)tspec.tv_nsec;
 }
 
-void x11_framelock(){
-    uint64_t now = x11_get_time();
-    if (!x11_state.last_timestamp){
-        x11_state.last_timestamp = now;
+void brr_x11_framelock(){
+    uint64_t now = brr_x11_get_time();
+    if (!brr_x11_state.last_timestamp){
+        brr_x11_state.last_timestamp = now;
         return;
     }
-    uint64_t elapsed = now - x11_state.last_timestamp;
+    uint64_t elapsed = now - brr_x11_state.last_timestamp;
     uint64_t frame_duration_ns = 1000000000 / FPS;
     if (elapsed < frame_duration_ns) {
         struct timespec req = {
@@ -570,14 +569,14 @@ void x11_framelock(){
         };
         nanosleep(&req, NULL);
     }
-    x11_state.last_timestamp = x11_get_time();
+    brr_x11_state.last_timestamp = brr_x11_get_time();
 }
 
 // Translate the X11 KeySyms for a key to a GLFW key code
 // NOTE: This is only used as a fallback, in case the XKB method fails
 //       It is layout-dependent and will fail partially on most non-US layouts
 //
-static int translateKeySyms(const KeySym* keysyms, int width)
+static int brr_x11_translateKeySyms(const KeySym* keysyms, int width)
 {
     if (width > 1)
     {
@@ -744,8 +743,8 @@ static int translateKeySyms(const KeySym* keysyms, int width)
 static void x11_init_keytable(void)
 {
 	// source: GLFW
-    XkbDescPtr desc = XkbGetMap(x11_state.display, 0, XkbUseCoreKbd);
-    XkbGetNames(x11_state.display, XkbKeyNamesMask | XkbKeyAliasesMask, desc);
+    XkbDescPtr desc = XkbGetMap(brr_x11_state.display, 0, XkbUseCoreKbd);
+    XkbGetNames(brr_x11_state.display, XkbKeyNamesMask | XkbKeyAliasesMask, desc);
     int scancodeMin = desc->min_key_code;
     int scancodeMax = desc->max_key_code;
     const struct { int key; char* name; } keymap[] =
@@ -923,7 +922,7 @@ static void x11_init_keytable(void)
     XkbFreeKeyboard(desc, 0, True);
 
     int width;
-    KeySym* keysyms = XGetKeyboardMapping(x11_state.display,
+    KeySym* keysyms = XGetKeyboardMapping(brr_x11_state.display,
                                             scancodeMin,
                                             scancodeMax - scancodeMin + 1,
                                             &width);
@@ -935,7 +934,7 @@ static void x11_init_keytable(void)
         if (brr_app.keycodes[scancode] == BRR_KEY_UNKNOWN)
         {
             const size_t base = (scancode - scancodeMin) * width;
-            brr_app.keycodes[scancode] = translateKeySyms(&keysyms[base], width);
+            brr_app.keycodes[scancode] = brr_x11_translateKeySyms(&keysyms[base], width);
         }
     }
 
@@ -944,35 +943,35 @@ static void x11_init_keytable(void)
 
 void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
     init_brr_app(initial_width, initial_height, frame, event);
-	x11_setup();
+	brr_x11_setup();
     x11_init_keytable();
-    x11_alloc_image();
-    x11_wait_for_expose();
+    brr_x11_alloc_image();
+    brr_x11_wait_for_expose();
 
-    x11_state.is_running = 1;
-    while (x11_state.is_running) {
-        x11_fetch_events();
+    brr_x11_state.is_running = 1;
+    while (brr_x11_state.is_running) {
+        brr_x11_fetch_events();
         if (brr_app.frame){
-        	brr_app.frame(x11_state.imgdata, brr_app.width, brr_app.height);
+        	brr_app.frame(brr_x11_state.imgdata, brr_app.width, brr_app.height);
         }
-        XPutImage(x11_state.display, x11_state.window, x11_state.gc, x11_state.image,
+        XPutImage(brr_x11_state.display, brr_x11_state.window, brr_x11_state.gc, brr_x11_state.image,
 			0, 0,
 			0, 0,
 			brr_app.width, brr_app.height );
-        XFlush(x11_state.display);
-        x11_framelock();
+        XFlush(brr_x11_state.display);
+        brr_x11_framelock();
     }
 
-    x11_dealloc_image();
-    XFreeGC(x11_state.display, x11_state.gc);
-    XCloseDisplay(x11_state.display);
+    brr_x11_dealloc_image();
+    XFreeGC(brr_x11_state.display, brr_x11_state.gc);
+    XCloseDisplay(brr_x11_state.display);
 }
 
 // --------------------------------------------------------------------------------
 #elif defined(_WIN32) || 1
 #include <windows.h>
 
-typedef struct windows_state_t
+typedef struct brr_windows_state_t
 {
     int is_running;
     uint8_t *buffer;
@@ -980,32 +979,32 @@ typedef struct windows_state_t
     BITMAPINFO bitmapinfo;
     LARGE_INTEGER freq;
     LARGE_INTEGER last_timestamp;
-} windows_state_t;
+} brr_windows_state_t;
 
-static windows_state_t windows_state;
+static brr_windows_state_t brr_windows_state;
 
-static void windows_free_buffer(){
-     if (windows_state.buffer){
-        free(windows_state.buffer);
-        windows_state.buffer = NULL;
+static void brr_windows_free_buffer(){
+     if (brr_windows_state.buffer){
+        free(brr_windows_state.buffer);
+        brr_windows_state.buffer = NULL;
     }
 }
 
-static void windows_realloc_buffer(){
-    windows_free_buffer();
-    windows_state.buffer = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
+static void brr_windows_realloc_buffer(){
+    brr_windows_free_buffer();
+    brr_windows_state.buffer = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
 }
 
-static void windows_set_dimensions(int width, int height){
+static void brr_windows_set_dimensions(int width, int height){
     brr_app.width = width;
     brr_app.height = height;
-    windows_state.bitmapinfo.bmiHeader.biWidth = width;
-    windows_state.bitmapinfo.bmiHeader.biHeight = height;
-    windows_realloc_buffer();
+    brr_windows_state.bitmapinfo.bmiHeader.biWidth = width;
+    brr_windows_state.bitmapinfo.bmiHeader.biHeight = height;
+    brr_windows_realloc_buffer();
 }
 
 // glfw/src/win32_init.c
-static void windows_init_keytable(void){
+static void brr_windows_init_keytable(void){
     brr_app.keycodes[0x00B] = BRR_KEY_0;
     brr_app.keycodes[0x002] = BRR_KEY_1;
     brr_app.keycodes[0x003] = BRR_KEY_2;
@@ -1129,17 +1128,17 @@ static void windows_init_keytable(void){
     brr_app.keycodes[0x04A] = BRR_KEY_KP_SUBTRACT;
 }
 
-static void windows_setup(){
-    memset(&windows_state, 0, sizeof(windows_state));
-    windows_state.bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    windows_state.bitmapinfo.bmiHeader.biBitCount = 32;
-    windows_state.bitmapinfo.bmiHeader.biPlanes = 1;
-    windows_state.bitmapinfo.bmiHeader.biCompression = BI_RGB;
-    windows_set_dimensions(brr_app.width, brr_app.height);
-    QueryPerformanceFrequency(&windows_state.freq);
+static void brr_windows_setup(){
+    memset(&brr_windows_state, 0, sizeof(brr_windows_state));
+    brr_windows_state.bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    brr_windows_state.bitmapinfo.bmiHeader.biBitCount = 32;
+    brr_windows_state.bitmapinfo.bmiHeader.biPlanes = 1;
+    brr_windows_state.bitmapinfo.bmiHeader.biCompression = BI_RGB;
+    brr_windows_set_dimensions(brr_app.width, brr_app.height);
+    QueryPerformanceFrequency(&brr_windows_state.freq);
 }
 
-LRESULT CALLBACK windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg)
     {
     case WM_PAINT:
@@ -1149,8 +1148,8 @@ LRESULT CALLBACK windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
                 device_context,
                 0, 0, brr_app.width, brr_app.height,
                 0, 0, brr_app.width, brr_app.height,
-                windows_state.buffer,
-                &windows_state.bitmapinfo,
+                brr_windows_state.buffer,
+                &brr_windows_state.bitmapinfo,
                 DIB_RGB_COLORS,
                 SRCCOPY
         );
@@ -1160,11 +1159,11 @@ LRESULT CALLBACK windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         UINT width = LOWORD(lParam);
         UINT height = HIWORD(lParam);
         if (width != brr_app.width || height != brr_app.height){
-            windows_set_dimensions(width, height);
+            brr_windows_set_dimensions(width, height);
         }
         return 0;
     case WM_CLOSE:
-        windows_state.is_running = 0;
+        brr_windows_state.is_running = 0;
         return 0;
     case WM_KEYDOWN:
     case WM_KEYUP:
@@ -1189,15 +1188,15 @@ LRESULT CALLBACK windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 
 const wchar_t win_class_name[] = L"BRRWINDOWCLASS";
 
-static void windows_create_window(){
+static void brr_windows_create_window(){
     WNDCLASSW wc;
     memset(&wc, 0, sizeof(wc));
-    wc.lpfnWndProc = windows_winproc;
+    wc.lpfnWndProc = brr_windows_winproc;
     wc.hInstance = GetModuleHandleW(NULL);
     wc.lpszClassName = win_class_name;
 
     RegisterClassW(&wc); 
-    windows_state.window = CreateWindowExW(
+    brr_windows_state.window = CreateWindowExW(
         0,
         win_class_name,
         L"BRR",
@@ -1206,61 +1205,61 @@ static void windows_create_window(){
         NULL, NULL, GetModuleHandleW(NULL), NULL
     );
 
-    if (!windows_state.window) return;
-    ShowWindow(windows_state.window, SW_SHOW);
+    if (!brr_windows_state.window) return;
+    ShowWindow(brr_windows_state.window, SW_SHOW);
 }
 
-static void windows_destroy_window(){
-    DestroyWindow(windows_state.window); 
-    windows_state.window = 0;
+static void brr_windows_destroy_window(){
+    DestroyWindow(brr_windows_state.window); 
+    brr_windows_state.window = 0;
     UnregisterClassW(win_class_name, GetModuleHandleW(NULL));
 }
 
-void windows_framelock(){
+static void brr_windows_framelock(){
     LARGE_INTEGER now;
     QueryPerformanceCounter(&now);
-    if (windows_state.last_timestamp.QuadPart == 0){
-        windows_state.last_timestamp = now;
+    if (brr_windows_state.last_timestamp.QuadPart == 0){
+        brr_windows_state.last_timestamp = now;
         return;
     }
-    double elapsed = (double)(now.QuadPart - windows_state.last_timestamp.QuadPart) / windows_state.freq.QuadPart;
+    double elapsed = (double)(now.QuadPart - brr_windows_state.last_timestamp.QuadPart) / brr_windows_state.freq.QuadPart;
     double frame_duration = 1.0 / FPS;
     if (elapsed < frame_duration) {
         Sleep((frame_duration - elapsed) * 1000);
     }
-    QueryPerformanceCounter(&windows_state.last_timestamp);
+    QueryPerformanceCounter(&brr_windows_state.last_timestamp);
 }
 
 void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
     init_brr_app(initial_width, initial_height, frame, event);
-	windows_init_keytable();
-    windows_setup();
-    windows_create_window();
-    windows_state.is_running = 1;
+	brr_windows_init_keytable();
+    brr_windows_setup();
+    brr_windows_create_window();
+    brr_windows_state.is_running = 1;
 
-    while (windows_state.is_running)
+    while (brr_windows_state.is_running)
     {
         MSG msg;
         while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
             if (msg.message == WM_QUIT){
-                windows_state.is_running = 0;
+                brr_windows_state.is_running = 0;
             }
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
         
         if (brr_app.frame){
-            brr_app.frame(windows_state.buffer, brr_app.width, brr_app.height);
+            brr_app.frame(brr_windows_state.buffer, brr_app.width, brr_app.height);
         }
 
-        InvalidateRect(windows_state.window, NULL, FALSE);
-        UpdateWindow(windows_state.window); 
+        InvalidateRect(brr_windows_state.window, NULL, FALSE);
+        UpdateWindow(brr_windows_state.window); 
 
-        windows_framelock();
+        brr_windows_framelock();
     }
 
-    windows_destroy_window();
-    windows_free_buffer();
+    brr_windows_destroy_window();
+    brr_windows_free_buffer();
 }
 
 #endif

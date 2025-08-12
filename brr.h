@@ -2,9 +2,11 @@
 #define BRR_INCL
 #include <stdint.h> // uint8_t, uint32_t
 
-#define BYTES_PER_PIXEL 4
-#define FPS 30
-#define MAX_KEYCODES 512
+enum{
+    BRR_BYTES_PER_PIXEL = 4,
+    BRR_FPS = 30,
+    BRR_MAX_KEYCODES = 512
+};
 
 typedef enum brr_event_type{
     BRR_EV_KEYDOWN,
@@ -148,7 +150,7 @@ typedef struct brr_app_t {
     void (*event)(brr_event);
     int width;
     int height;
-    brr_keycode keycodes[MAX_KEYCODES];
+    brr_keycode keycodes[BRR_MAX_KEYCODES];
 } brr_app_t;
 
 void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event));
@@ -336,7 +338,7 @@ static void init_keytable(void)
     if (self) {
         colorSpaceRef = CGColorSpaceCreateDeviceRGB();
         // todo CADisplayLink or CVDisplayLink
-        _timer = [NSTimer scheduledTimerWithTimeInterval: 1.0/FPS
+        _timer = [NSTimer scheduledTimerWithTimeInterval: 1.0/BRR_FPS
                         target: self
                         selector:@selector(onTick:)
                         userInfo: nil repeats:YES];
@@ -411,9 +413,9 @@ static void init_keytable(void)
         free(buffer);
         buffer = NULL;
     }
-    size_t bitmapSize = sizeof(uint8_t) * brr_app.width * BYTES_PER_PIXEL * brr_app.height;
+    size_t bitmapSize = sizeof(uint8_t) * brr_app.width * BRR_BYTES_PER_PIXEL * brr_app.height;
     buffer = malloc(bitmapSize);
-    contextRef = CGBitmapContextCreate(buffer, brr_app.width, brr_app.height, 8, brr_app.width * BYTES_PER_PIXEL, colorSpaceRef, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little);
+    contextRef = CGBitmapContextCreate(buffer, brr_app.width, brr_app.height, 8, brr_app.width * BRR_BYTES_PER_PIXEL, colorSpaceRef, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little);
     [self setNeedsDisplay:YES];
 }
 
@@ -441,7 +443,7 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
 }
 
 // --------------------------------------------------------------------------------
-#elif defined(__linux__) || defined(__unix__) || 1
+#elif defined(__linux__) || defined(__unix__) || 0
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/XKBlib.h>
@@ -504,8 +506,8 @@ static void brr_x11_alloc_image(){
         brr_x11_state.buffer = NULL;
     }
 
-    brr_x11_state.buffer = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
-    brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, brr_x11_state.buffer, brr_app.width, brr_app.height, 32, brr_app.width * BYTES_PER_PIXEL);
+    brr_x11_state.buffer = malloc(brr_app.width * brr_app.height * BRR_BYTES_PER_PIXEL);
+    brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, brr_x11_state.buffer, brr_app.width, brr_app.height, 32, brr_app.width * BRR_BYTES_PER_PIXEL);
 }
 
 static void brr_x11_dealloc_image(){
@@ -561,7 +563,7 @@ void brr_x11_framelock(){
         return;
     }
     uint64_t elapsed = now - brr_x11_state.last_timestamp;
-    uint64_t frame_duration_ns = 1000000000 / FPS;
+    uint64_t frame_duration_ns = 1000000000 / BRR_FPS;
     if (elapsed < frame_duration_ns) {
         struct timespec req = {
             .tv_sec = 0,
@@ -993,7 +995,7 @@ static void brr_windows_free_buffer(){
 
 static void brr_windows_realloc_buffer(){
     brr_windows_free_buffer();
-    brr_windows_state.buffer = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
+    brr_windows_state.buffer = malloc(brr_app.width * brr_app.height * BRR_BYTES_PER_PIXEL);
 }
 
 static void brr_windows_set_dimensions(int width, int height){
@@ -1224,7 +1226,7 @@ static void brr_windows_framelock(){
         return;
     }
     double elapsed = (double)(now.QuadPart - brr_windows_state.last_timestamp.QuadPart) / brr_windows_state.freq.QuadPart;
-    double frame_duration = 1.0 / FPS;
+    double frame_duration = 1.0 / BRR_FPS;
     if (elapsed < frame_duration) {
         Sleep((frame_duration - elapsed) * 1000);
     }

@@ -1,6 +1,6 @@
 #ifndef BRR_INCL
 #define BRR_INCL
-#include "stdint.h" // uint8_t, uint32_t
+#include <stdint.h> // uint8_t, uint32_t
 
 #define BYTES_PER_PIXEL 4
 #define FPS 30
@@ -140,7 +140,7 @@ typedef enum brr_keycode{
 
 typedef struct brr_event{
     brr_event_type event_type;
-    int keycode;
+    brr_keycode keycode;
 } brr_event;
 
 typedef struct brr_app_t {
@@ -165,7 +165,7 @@ static void init_brr_app(int initial_width, int initial_height, void (*frame)(ui
     brr_app.height = initial_height;
     brr_app.frame = frame;
     brr_app.event = event;
-    memset(brr_app.keycodes, -1, sizeof(brr_app.keycodes));
+    memset(brr_app.keycodes, BRR_KEY_UNKNOWN, sizeof(brr_app.keycodes));
 }
 
 #if defined(__APPLE__) && 1
@@ -173,7 +173,6 @@ static void init_brr_app(int initial_width, int initial_height, void (*frame)(ui
 
 static void init_keytable(void)
 {
-
     brr_app.keycodes[0x1D] = BRR_KEY_0;
     brr_app.keycodes[0x12] = BRR_KEY_1;
     brr_app.keycodes[0x13] = BRR_KEY_2;
@@ -466,16 +465,6 @@ typedef struct x11_state_t{
 
 static x11_state_t x11_state;
 
-static int x11_get_shift_of_mask(unsigned long mask){
-    int shift = 0;
-    if (mask == 0) return shift;
-    while ((mask & 1) == 0 && shift < sizeof(unsigned long) * 8)
-    {
-        mask >>= 1;
-        shift++;
-    }
-    return shift;
-}
 
 static void x11_setup(){
     memset(&x11_state, 0, sizeof(x11_state));
@@ -487,6 +476,9 @@ static void x11_setup(){
     x11_state.screen = DefaultScreen(x11_state.display);
     x11_state.depth =  DefaultDepth(x11_state.display, x11_state.screen);
     x11_state.visual = DefaultVisual(x11_state.display, x11_state.screen);
+    if (x11_state.depth < 24) {
+        abort(); 
+    }
 
     Window root_window = XRootWindow(x11_state.display, x11_state.screen);
     unsigned long attribmask = CWEventMask;
@@ -752,7 +744,6 @@ static int translateKeySyms(const KeySym* keysyms, int width)
 static void x11_init_keytable(void)
 {
 	// source: GLFW
-    memset(brr_app.keycodes, -1, sizeof(brr_app.keycodes));
     XkbDescPtr desc = XkbGetMap(x11_state.display, 0, XkbUseCoreKbd);
     XkbGetNames(x11_state.display, XkbKeyNamesMask | XkbKeyAliasesMask, desc);
     int scancodeMin = desc->min_key_code;
@@ -1015,8 +1006,6 @@ static void windows_set_dimensions(int width, int height){
 
 // glfw/src/win32_init.c
 static void windows_init_keytable(void){
-    memset(brr_app.keycodes, -1, sizeof(brr_app.keycodes));
-
     brr_app.keycodes[0x00B] = BRR_KEY_0;
     brr_app.keycodes[0x002] = BRR_KEY_1;
     brr_app.keycodes[0x003] = BRR_KEY_2;
@@ -1189,7 +1178,6 @@ LRESULT CALLBACK windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
             brr_event event;
             event.event_type = isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN;
             event.keycode = brr_app.keycodes[scancode];
-            printf("event");
             brr_app.event(event);
         }
         return 0;
@@ -1199,23 +1187,23 @@ LRESULT CALLBACK windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-static void windows_create_window(){
-    const char CLASS_NAME[] = "BRRWINDOWCLASS";
+const wchar_t win_class_name[] = L"BRRWINDOWCLASS";
 
-    WNDCLASS wc;
+static void windows_create_window(){
+    WNDCLASSW wc;
     memset(&wc, 0, sizeof(wc));
     wc.lpfnWndProc = windows_winproc;
-    wc.hInstance = GetModuleHandle(NULL);
-    wc.lpszClassName = CLASS_NAME;
+    wc.hInstance = GetModuleHandleW(NULL);
+    wc.lpszClassName = win_class_name;
 
-    RegisterClass(&wc); 
-    windows_state.window = CreateWindowEx(
+    RegisterClassW(&wc); 
+    windows_state.window = CreateWindowExW(
         0,
-        CLASS_NAME,
-        "Brr",
+        win_class_name,
+        L"BRR",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, brr_app.width, brr_app.height,
-        NULL, NULL, GetModuleHandle(NULL), NULL
+        NULL, NULL, GetModuleHandleW(NULL), NULL
     );
 
     if (!windows_state.window) return;
@@ -1223,8 +1211,9 @@ static void windows_create_window(){
 }
 
 static void windows_destroy_window(){
-    DestroyWindow(windows_state.window); windows_state.window = 0;
-    UnregisterClass("BRRWINDOWCLASS", GetModuleHandleW(NULL));
+    DestroyWindow(windows_state.window); 
+    windows_state.window = 0;
+    UnregisterClassW(win_class_name, GetModuleHandleW(NULL));
 }
 
 void windows_framelock(){
@@ -1242,8 +1231,9 @@ void windows_framelock(){
     QueryPerformanceCounter(&windows_state.last_timestamp);
 }
 
-static void windows_main(){
-    windows_init_keytable();
+void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
+    init_brr_app(initial_width, initial_height, frame, event);
+	windows_init_keytable();
     windows_setup();
     windows_create_window();
     windows_state.is_running = 1;
@@ -1271,11 +1261,6 @@ static void windows_main(){
 
     windows_destroy_window();
     windows_free_buffer();
-}   
-
-void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
-    init_brr_app(initial_width, initial_height, frame, event);
-	windows_main();
 }
 
 #endif

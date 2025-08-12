@@ -458,7 +458,7 @@ typedef struct brr_x11_state_t{
     int screen;
     int depth;
     Atom wm_delete_window;
-    uint8_t *imgdata;
+    uint8_t *buffer;
     XImage *image;
     uint64_t last_timestamp;
 } brr_x11_state_t;
@@ -501,11 +501,11 @@ static void brr_x11_alloc_image(){
     if (brr_x11_state.image){
         XDestroyImage(brr_x11_state.image);
         brr_x11_state.image = NULL;
-        brr_x11_state.imgdata = NULL;
+        brr_x11_state.buffer = NULL;
     }
 
-    brr_x11_state.imgdata = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
-    brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, brr_x11_state.imgdata, brr_app.width, brr_app.height, 32, brr_app.width * BYTES_PER_PIXEL);
+    brr_x11_state.buffer = malloc(brr_app.width * brr_app.height * BYTES_PER_PIXEL);
+    brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, brr_x11_state.buffer, brr_app.width, brr_app.height, 32, brr_app.width * BYTES_PER_PIXEL);
 }
 
 static void brr_x11_dealloc_image(){
@@ -952,7 +952,7 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
     while (brr_x11_state.is_running) {
         brr_x11_fetch_events();
         if (brr_app.frame){
-        	brr_app.frame(brr_x11_state.imgdata, brr_app.width, brr_app.height);
+        	brr_app.frame(brr_x11_state.buffer, brr_app.width, brr_app.height);
         }
         XPutImage(brr_x11_state.display, brr_x11_state.window, brr_x11_state.gc, brr_x11_state.image,
 			0, 0,
@@ -966,6 +966,7 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
     XFreeGC(brr_x11_state.display, brr_x11_state.gc);
     XCloseDisplay(brr_x11_state.display);
 }
+
 
 // --------------------------------------------------------------------------------
 #elif defined(_WIN32) || 1

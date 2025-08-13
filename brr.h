@@ -170,7 +170,7 @@ static void init_brr_app(int initial_width, int initial_height, void (*frame)(ui
     memset(brr_app.keycodes, BRR_KEY_UNKNOWN, sizeof(brr_app.keycodes));
 }
 
-#if defined(__APPLE__) && 0
+#if defined(__APPLE__) && 1
 #import <Cocoa/Cocoa.h>
 
 static void init_keytable(void)
@@ -1002,7 +1002,7 @@ static void brr_windows_set_dimensions(int width, int height){
     brr_app.width = width;
     brr_app.height = height;
     brr_windows_state.bitmapinfo.bmiHeader.biWidth = width;
-    brr_windows_state.bitmapinfo.bmiHeader.biHeight = height;
+    brr_windows_state.bitmapinfo.bmiHeader.biHeight = -height;
     brr_windows_realloc_buffer();
 }
 
@@ -1177,6 +1177,7 @@ LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
         BOOL isKeyReleased = (keyFlags & KF_UP) == KF_UP;
        
         if (brr_app.event){
+            // TODO ALT 
             brr_event event;
             event.event_type = isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN;
             event.keycode = brr_app.keycodes[scancode];

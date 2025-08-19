@@ -163,7 +163,7 @@ void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *
 #include <string.h> // memset
 static brr_app_t brr_app;
 
-static void init_brr_app(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *)){
+static void brr_init_app(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *)){
     brr_app.width = initial_width;
     brr_app.height = initial_height;
     brr_app.frame_cb = frame_cb;
@@ -181,10 +181,10 @@ static void brr_send_key_event(brr_event_type ev_type, brr_keycode keycode){
     }
 }
 
-#if defined(__APPLE__) && 0
+#if defined(__APPLE__) && 1
 #import <Cocoa/Cocoa.h>
 
-static void init_keytable(void)
+static void brr_mac_init_keytable(void)
 {
     brr_app.keycodes[0x1D] = BRR_KEY_0;
     brr_app.keycodes[0x12] = BRR_KEY_1;
@@ -437,8 +437,8 @@ static void init_keytable(void)
 @end
 
 void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
-    init_brr_app(initial_width, initial_height, frame_cb, event_cb);
-    init_keytable();
+    brr_init_app(initial_width, initial_height, frame_cb, event_cb);
+    brr_mac_init_keytable();
     NSApplication *app = [NSApplication sharedApplication];
     BrrAppDelegate *delegate = [[BrrAppDelegate alloc] init];
     [app setDelegate:delegate];
@@ -741,7 +741,7 @@ static int brr_x11_translateKeySyms(const KeySym* keysyms, int width)
     return BRR_KEY_UNKNOWN;
 }
 
-static void x11_init_keytable(void)
+static void brr_x11_init_keytable(void)
 {
 	// source: GLFW
     XkbDescPtr desc = XkbGetMap(brr_x11_state.display, 0, XkbUseCoreKbd);
@@ -943,9 +943,9 @@ static void x11_init_keytable(void)
 }
 
 void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
-    init_brr_app(initial_width, initial_height, frame_cb, event_cb);
+    brr_init_app(initial_width, initial_height, frame_cb, event_cb);
 	brr_x11_setup();
-    x11_init_keytable();
+    brr_x11_init_keytable();
     brr_x11_alloc_image();
     brr_x11_wait_for_expose();
 
@@ -1228,7 +1228,7 @@ static void brr_windows_framelock(){
 }
 
 void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event)(brr_event*)){
-    init_brr_app(initial_width, initial_height, frame_cb, event);
+    brr_init_app(initial_width, initial_height, frame_cb, event);
 	brr_windows_init_keytable();
     brr_windows_setup();
     brr_windows_create_window();

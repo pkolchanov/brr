@@ -1,16 +1,51 @@
-brr.h: single header application wrapper library focused on software rendering. Supports macOS, linux (x11), and windows (gdi). 
+# brr.h
+
+brr.h is a single-header application wrapper library for software rendering apps. It supports macOS (CG), linux (x11), and windows (GDI). 
 
 
 ## Minimal example
 
+```c
+#define BRR_IMPLEMENTATION
+#include "brr.h"
+
+static int r = 128;
+
+void fill(uint8_t *buffer, int width, int height){
+    int idx = 0;
+    static int t = 0;
+    t += 1;
+    while (idx < width * height * BRR_BYTES_PER_PIXEL){
+        buffer[idx]     = 0;       // BLUE
+        buffer[idx + 1] = 0;       // GREEN
+        buffer[idx + 2] = r % 255; // RED
+        
+        idx += BRR_BYTES_PER_PIXEL;
+    }
+}
+
+void event(brr_event *event){
+    switch (event->keycode) {
+        case BRR_KEY_UP:
+            r += 3;
+            break;
+        case BRR_KEY_DOWN:
+            r -= 3;
+            break;
+        default:
+            break;
+    }
+}
+
+int main(int argc, const char * argv[]) {
+    brr_start(320, 200, fill, event);
+}
+
 ```
+
+## Build 
+```bash
 # macOS
-gcc -x objective-c -framework Cocoa main.c -o main
-
-# macOS (x11)
-gcc -g -I /usr/X11/include main.c -L/usr/X11/lib -lX11  -o main && ./main
-
-# macOS (wine)
-x86_64-w64-mingw32-gcc -o hello.exe main.c -mwindows && wine hello.exe
+gcc -x objective-c -framework Cocoa main.c -o main && ./main
 
 ```

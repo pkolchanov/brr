@@ -146,27 +146,27 @@ typedef struct brr_event{
 } brr_event;
 
 typedef struct brr_app_t {
-    void (*frame)(uint8_t *, int, int);
-    void (*event)(brr_event);
+    void (*frame_cb)(uint8_t *, int, int);
+    void (*event_cb)(brr_event);
     int width;
     int height;
     brr_keycode keycodes[BRR_MAX_KEYCODES];
 } brr_app_t;
 
-void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event));
+void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event));
 #endif
 
 
 #ifdef BRR_IMPLEMENTATION
 #include <stdio.h>  // printf
 #include <string.h> // memset
-brr_app_t brr_app;
+static brr_app_t brr_app;
 
-static void init_brr_app(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
+static void init_brr_app(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event)){
     brr_app.width = initial_width;
     brr_app.height = initial_height;
-    brr_app.frame = frame;
-    brr_app.event = event;
+    brr_app.frame_cb = frame_cb;
+    brr_app.event_cb = event_cb;
     memset(brr_app.keycodes, BRR_KEY_UNKNOWN, sizeof(brr_app.keycodes));
 }
 
@@ -351,14 +351,14 @@ static void init_keytable(void)
 }
 
 - (void)keyDown:(NSEvent *)event{
-    if (brr_app.event){
-        brr_app.event((brr_event){BRR_EV_KEYDOWN, brr_app.keycodes[event.keyCode]});
+    if (brr_app.event_cb){
+        brr_app.event_cb((brr_event){BRR_EV_KEYDOWN, brr_app.keycodes[event.keyCode]});
     }
 }
 
 - (void)keyUp:(NSEvent *)event{
-    if (brr_app.event){
-        brr_app.event((brr_event){BRR_EV_KEYUP, brr_app.keycodes[event.keyCode]});
+    if (brr_app.event_cb){
+        brr_app.event_cb((brr_event){BRR_EV_KEYUP, brr_app.keycodes[event.keyCode]});
     }
 }
 
@@ -382,18 +382,18 @@ static void init_keytable(void)
         keyCode = BRR_KEY_RIGHT_SUPER;
         down = 0 != (newFlags & NSEventModifierFlagCommand);
     }
-    if (keyCode > 0 && brr_app.event) {
+    if (keyCode > 0 && brr_app.event_cb) {
         brr_event ev;
         ev.event_type = down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP;
         ev.keycode = keyCode;
-        brr_app.event(ev);
+        brr_app.event_cb(ev);
     }
     oldFlags = [event modifierFlags];
 }
 
 - (void)drawRect:(NSRect)dirtyRect{
-    if (brr_app.frame) {
-        brr_app.frame(buffer, brr_app.width, brr_app.height);
+    if (brr_app.frame_cb) {
+        brr_app.frame_cb(buffer, brr_app.width, brr_app.height);
     }
     CGImageRef image = CGBitmapContextCreateImage(contextRef);
     CGContextRef ctx = [NSGraphicsContext currentContext].CGContext;
@@ -432,8 +432,8 @@ static void init_keytable(void)
 }
 @end
 
-void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
-    init_brr_app(initial_width, initial_height, frame, event);
+void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event)(brr_event)){
+    init_brr_app(initial_width, initial_height, frame_cb, event);
     init_keytable();
     NSApplication *app = [NSApplication sharedApplication];
     BrrAppDelegate *delegate = [[BrrAppDelegate alloc] init];
@@ -528,11 +528,11 @@ static void brr_x11_fetch_events(){
             brr_x11_alloc_image();
         }
         if (brr_x11_state.event.type == KeyPress || brr_x11_state.event.type == KeyRelease) {
-            if (brr_app.event){
+            if (brr_app.event_cb){
                 brr_event event;
                 event.event_type = brr_x11_state.event.type == KeyPress ? BRR_EV_KEYDOWN : BRR_EV_KEYUP;
                 event.keycode = brr_app.keycodes[brr_x11_state.event.xkey.keycode];
-                brr_app.event(event);
+                brr_app.event_cb(event);
             }
         }
     }
@@ -943,8 +943,8 @@ static void x11_init_keytable(void)
     XFree(keysyms);
 }
 
-void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
-    init_brr_app(initial_width, initial_height, frame, event);
+void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event)(brr_event)){
+    init_brr_app(initial_width, initial_height, frame_cb, event);
 	brr_x11_setup();
     x11_init_keytable();
     brr_x11_alloc_image();
@@ -953,8 +953,8 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
     brr_x11_state.is_running = 1;
     while (brr_x11_state.is_running) {
         brr_x11_fetch_events();
-        if (brr_app.frame){
-        	brr_app.frame(brr_x11_state.buffer, brr_app.width, brr_app.height);
+        if (brr_app.frame_cb){
+        	brr_app.frame_cb(brr_x11_state.buffer, brr_app.width, brr_app.height);
         }
         XPutImage(brr_x11_state.display, brr_x11_state.window, brr_x11_state.gc, brr_x11_state.image,
 			0, 0,
@@ -1176,12 +1176,12 @@ LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
         int scancode = (keyFlags & (KF_EXTENDED | 0xff));
         BOOL isKeyReleased = (keyFlags & KF_UP) == KF_UP;
        
-        if (brr_app.event){
+        if (brr_app.event_cb){
             // TODO ALT 
             brr_event event;
             event.event_type = isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN;
             event.keycode = brr_app.keycodes[scancode];
-            brr_app.event(event);
+            brr_app.event_cb(event);
         }
         return 0;
     default:
@@ -1234,8 +1234,8 @@ static void brr_windows_framelock(){
     QueryPerformanceCounter(&brr_windows_state.last_timestamp);
 }
 
-void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, int, int), void (*event)(brr_event)){
-    init_brr_app(initial_width, initial_height, frame, event);
+void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event)(brr_event)){
+    init_brr_app(initial_width, initial_height, frame_cb, event);
 	brr_windows_init_keytable();
     brr_windows_setup();
     brr_windows_create_window();
@@ -1252,8 +1252,8 @@ void brr_start(int initial_width, int initial_height, void (*frame)(uint8_t *, i
             DispatchMessage(&msg);
         }
         
-        if (brr_app.frame){
-            brr_app.frame(brr_windows_state.buffer, brr_app.width, brr_app.height);
+        if (brr_app.frame_cb){
+            brr_app.frame_cb(brr_windows_state.buffer, brr_app.width, brr_app.height);
         }
 
         InvalidateRect(brr_windows_state.window, NULL, FALSE);

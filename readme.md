@@ -1,6 +1,6 @@
 # brr.h
 
-brr.h is a single-header application wrapper library for software rendering apps. It supports macOS (CG), linux (x11), and windows (GDI). 
+brr.h is a single-header application wrapper for software rendering apps. It supports macOS (Core Graphics), linux (x11), and windows (GDI). 
 
 
 ## Minimal example
@@ -11,10 +11,8 @@ brr.h is a single-header application wrapper library for software rendering apps
 
 static int r = 128;
 
-void fill(uint8_t *buffer, int width, int height){
+void frame(uint8_t *buffer, int width, int height){
     int idx = 0;
-    static int t = 0;
-    t += 1;
     while (idx < width * height * BRR_BYTES_PER_PIXEL){
         buffer[idx]     = 0;       // BLUE
         buffer[idx + 1] = 0;       // GREEN
@@ -38,7 +36,7 @@ void event(brr_event *event){
 }
 
 int main(int argc, const char * argv[]) {
-    brr_start(320, 200, fill, event);
+    brr_start("hi brr", 320, 200, frame, event);
 }
 
 ```

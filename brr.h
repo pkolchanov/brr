@@ -151,10 +151,11 @@ typedef struct brr_app_t {
     int width;
     int height;
     brr_keycode keycodes[BRR_MAX_KEYCODES];
+    const char *window_name;
     brr_event event;
 } brr_app_t;
 
-void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *));
+void brr_start(const char* window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *));
 #endif
 
 
@@ -163,11 +164,12 @@ void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *
 #include <string.h> // memset
 static brr_app_t brr_app;
 
-static void brr_init_app(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *)){
+static void brr_init_app(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *)){
     brr_app.width = initial_width;
     brr_app.height = initial_height;
     brr_app.frame_cb = frame_cb;
     brr_app.event_cb = event_cb;
+    brr_app.window_name = window_name;
     memset(brr_app.keycodes, BRR_KEY_UNKNOWN, sizeof(brr_app.keycodes));
     memset(&brr_app.event, 0, sizeof(brr_event));
 }
@@ -320,6 +322,7 @@ static void brr_mac_init_keytable(void)
 @implementation BrrAppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+    NSString *windowName = [NSString stringWithUTF8String:brr_app.window_name];
     window = [[NSWindow alloc] initWithContentRect:NSMakeRect(100, 100, brr_app.width, brr_app.height)
                                          styleMask:(NSWindowStyleMaskTitled |
                                                     NSWindowStyleMaskClosable |
@@ -329,7 +332,7 @@ static void brr_mac_init_keytable(void)
 
     BrrView *view = [[BrrView alloc] init];
     [window setContentView:view];
-    [window setTitle:@"BRR"];
+    [window setTitle:windowName];
     [window makeKeyAndOrderFront:nil];
 }
 
@@ -436,8 +439,8 @@ static void brr_mac_init_keytable(void)
 }
 @end
 
-void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
-    brr_init_app(initial_width, initial_height, frame_cb, event_cb);
+void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
+    brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb);
     brr_mac_init_keytable();
     NSApplication *app = [NSApplication sharedApplication];
     BrrAppDelegate *delegate = [[BrrAppDelegate alloc] init];
@@ -494,8 +497,10 @@ static void brr_x11_setup(){
         abort();
     }
     XMapWindow(brr_x11_state.display, brr_x11_state.window);
+    XStoreName(brr_x11_state.display, brr_x11_state.window, brr_app.window_name);
     brr_x11_state.wm_delete_window = XInternAtom(brr_x11_state.display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(brr_x11_state.display, brr_x11_state.window, &brr_x11_state.wm_delete_window, 1);
+
 
     XGCValues xgcvalues;
     int valuemask = GCGraphicsExposures;
@@ -573,12 +578,10 @@ void brr_x11_framelock(){
     brr_x11_state.last_timestamp = brr_x11_get_time();
 }
 
-// Translate the X11 KeySyms for a key to a GLFW key code
-// NOTE: This is only used as a fallback, in case the XKB method fails
-//       It is layout-dependent and will fail partially on most non-US layouts
-//
+
 static int brr_x11_translateKeySyms(const KeySym* keysyms, int width)
 {
+    // source: GLFW
     if (width > 1)
     {
         switch (keysyms[1])
@@ -942,8 +945,8 @@ static void brr_x11_init_keytable(void)
     XFree(keysyms);
 }
 
-void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
-    brr_init_app(initial_width, initial_height, frame_cb, event_cb);
+void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
+    brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb);
 	brr_x11_setup();
     brr_x11_init_keytable();
     brr_x11_alloc_image();
@@ -981,6 +984,7 @@ typedef struct brr_windows_state_t
     BITMAPINFO bitmapinfo;
     LARGE_INTEGER freq;
     LARGE_INTEGER last_timestamp;
+    WCHAR *window_name_wide;
 } brr_windows_state_t;
 
 static brr_windows_state_t brr_windows_state;
@@ -1130,8 +1134,17 @@ static void brr_windows_init_keytable(void){
     brr_app.keycodes[0x04A] = BRR_KEY_KP_SUBTRACT;
 }
 
+WCHAR *brr_windows_convert_to_wchar(const char *input) {
+    int len = MultiByteToWideChar(CP_UTF8, 0, input, -1, NULL, 0);
+    if (len == 0) return NULL;
+    WCHAR *output = (WCHAR *)malloc(len * sizeof(WCHAR));
+    MultiByteToWideChar(CP_UTF8, 0, input, -1, output, len);
+    return output;
+}
+
 static void brr_windows_setup(){
     memset(&brr_windows_state, 0, sizeof(brr_windows_state));
+    brr_windows_state.window_name_wide = brr_windows_convert_to_wchar(brr_app.window_name);
     brr_windows_state.bitmapinfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     brr_windows_state.bitmapinfo.bmiHeader.biBitCount = 32;
     brr_windows_state.bitmapinfo.bmiHeader.biPlanes = 1;
@@ -1196,7 +1209,7 @@ static void brr_windows_create_window(){
     brr_windows_state.window = CreateWindowExW(
         0,
         win_class_name,
-        L"BRR",
+        brr_windows_state.window_name_wide,
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, brr_app.width, brr_app.height,
         NULL, NULL, GetModuleHandleW(NULL), NULL
@@ -1227,8 +1240,8 @@ static void brr_windows_framelock(){
     QueryPerformanceCounter(&brr_windows_state.last_timestamp);
 }
 
-void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event)(brr_event*)){
-    brr_init_app(initial_width, initial_height, frame_cb, event);
+void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
+    brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb);
 	brr_windows_init_keytable();
     brr_windows_setup();
     brr_windows_create_window();
@@ -1257,6 +1270,7 @@ void brr_start(int initial_width, int initial_height, void (*frame_cb)(uint8_t *
 
     brr_windows_destroy_window();
     brr_windows_free_buffer();
+    free(brr_windows_state.window_name_wide);
 }
 
 #endif

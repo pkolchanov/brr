@@ -183,7 +183,7 @@ static void brr_send_key_event(brr_event_type ev_type, brr_keycode keycode){
     }
 }
 
-#if defined(__APPLE__) && 1
+#if defined(__APPLE__)
 #import <Cocoa/Cocoa.h>
 
 static void brr_mac_init_keytable(void)
@@ -428,6 +428,7 @@ static void brr_mac_init_keytable(void)
 
 - (void)dealloc
 {
+    [super dealloc];
     [[self timer] invalidate];
     CGColorSpaceRelease(colorSpaceRef);
     CGContextRelease(contextRef);
@@ -450,7 +451,7 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
 }
 
 // --------------------------------------------------------------------------------
-#elif defined(__linux__) || defined(__unix__) || 0
+#elif defined(__linux__) || defined(__unix__)
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/XKBlib.h>
@@ -516,7 +517,7 @@ static void brr_x11_alloc_image(){
     }
 
     brr_x11_state.buffer = malloc(brr_app.width * brr_app.height * BRR_BYTES_PER_PIXEL);
-    brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, brr_x11_state.buffer, brr_app.width, brr_app.height, 32, brr_app.width * BRR_BYTES_PER_PIXEL);
+    brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, (char*) brr_x11_state.buffer, brr_app.width, brr_app.height, 32, brr_app.width * BRR_BYTES_PER_PIXEL);
 }
 
 static void brr_x11_dealloc_image(){
@@ -973,7 +974,7 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
 
 
 // --------------------------------------------------------------------------------
-#elif defined(_WIN32) || 1
+#elif defined(_WIN32)
 #include <windows.h>
 
 typedef struct brr_windows_state_t

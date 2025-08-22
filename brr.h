@@ -976,6 +976,10 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
 // --------------------------------------------------------------------------------
 #elif defined(_WIN32)
 #include <windows.h>
+#pragma comment (lib, "user32")
+#pragma comment (lib, "gdi32")
+#pragma comment(linker, "/SUBSYSTEM:WINDOWS")
+#pragma comment(linker, "/ENTRY:mainCRTStartup")
 
 typedef struct brr_windows_state_t
 {
@@ -1194,7 +1198,7 @@ LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
     default:
         break;
     }
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
 const wchar_t win_class_name[] = L"BRRWINDOWCLASS";

@@ -46,4 +46,12 @@ int main(int argc, const char * argv[]) {
 # macOS
 gcc -x objective-c -framework Cocoa main.c -o main && ./main
 
+# linux
+gcc main.c -lX11 -o main && ./main
+
+# windows (MSVC)
+cl main.c && main.exe
+
+# windows (mingw)
+gcc main.c -mwindows -o main.exe && ./main.exe
 ```

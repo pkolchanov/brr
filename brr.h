@@ -428,11 +428,11 @@ static void brr_mac_init_keytable(void)
 
 - (void)dealloc
 {
-    [super dealloc];
     [[self timer] invalidate];
     CGColorSpaceRelease(colorSpaceRef);
     CGContextRelease(contextRef);
     free(buffer);
+    [super dealloc];
 }
 
 - (BOOL)acceptsFirstResponder{

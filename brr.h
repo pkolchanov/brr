@@ -2,6 +2,10 @@
 #define BRR_INCL
 #include <stdint.h> // uint8_t, uint32_t
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum{
     BRR_BYTES_PER_PIXEL = 4,
     BRR_FPS = 30,
@@ -156,6 +160,10 @@ typedef struct brr_app_t {
 } brr_app_t;
 
 void brr_start(const char* window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *));
+
+#ifdef __cplusplus
+} // extern "C" {
+#endif
 #endif
 
 
@@ -374,7 +382,7 @@ static void brr_mac_init_keytable(void)
 
 - (void)flagsChanged:(NSEvent *)event {
     Boolean down = NO;
-    int keyCode = -1;
+    brr_keycode keyCode = BRR_KEY_UNKNOWN;
     NSEventModifierFlags newFlags = [event modifierFlags];
     if ((oldFlags ^ newFlags) & NSEventModifierFlagShift) {
         keyCode = BRR_KEY_RIGHT_SHIFT;
@@ -421,7 +429,7 @@ static void brr_mac_init_keytable(void)
         buffer = NULL;
     }
     size_t bitmapSize = sizeof(uint8_t) * brr_app.width * BRR_BYTES_PER_PIXEL * brr_app.height;
-    buffer = malloc(bitmapSize);
+    buffer = (uint8_t*) malloc(bitmapSize);
     contextRef = CGBitmapContextCreate(buffer, brr_app.width, brr_app.height, 8, brr_app.width * BRR_BYTES_PER_PIXEL, colorSpaceRef, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little);
     [self setNeedsDisplay:YES];
 }

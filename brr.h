@@ -517,19 +517,19 @@ static void brr_x11_setup(){
     brr_x11_state.gc = XCreateGC(brr_x11_state.display, brr_x11_state.window, valuemask, &xgcvalues );
 }
 
-static void brr_x11_alloc_image(){
+static void brr_x11_dealloc_image(){
     if (brr_x11_state.image){
         XDestroyImage(brr_x11_state.image);
         brr_x11_state.image = NULL;
         brr_x11_state.buffer = NULL;
     }
+}
+
+static void brr_x11_alloc_image(){
+    brr_x11_dealloc_image();
 
     brr_x11_state.buffer = malloc(brr_app.width * brr_app.height * BRR_BYTES_PER_PIXEL);
     brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, (char*) brr_x11_state.buffer, brr_app.width, brr_app.height, 32, brr_app.width * BRR_BYTES_PER_PIXEL);
-}
-
-static void brr_x11_dealloc_image(){
-    XDestroyImage(brr_x11_state.image);
 }
 
 static void brr_x11_fetch_events(){

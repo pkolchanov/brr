@@ -463,6 +463,9 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/XKBlib.h>
+#include <X11/extensions/XShm.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <stdlib.h> // malloc, free
 #include <time.h> // clock_gettime, nanosleep
 
@@ -476,9 +479,10 @@ typedef struct brr_x11_state_t{
     int screen;
     int depth;
     Atom wm_delete_window;
-    uint8_t *buffer;
     XImage *image;
     uint64_t last_timestamp;
+    int use_shm;
+    XShmSegmentInfo shminfo;
 } brr_x11_state_t;
 
 static brr_x11_state_t brr_x11_state;
@@ -491,11 +495,12 @@ static void brr_x11_setup(){
         abort();
     }
     brr_x11_state.screen = DefaultScreen(brr_x11_state.display);
-    brr_x11_state.depth =  DefaultDepth(brr_x11_state.display, brr_x11_state.screen);
+    brr_x11_state.depth = DefaultDepth(brr_x11_state.display, brr_x11_state.screen);
     brr_x11_state.visual = DefaultVisual(brr_x11_state.display, brr_x11_state.screen);
     if (brr_x11_state.depth < 24) {
         abort(); 
     }
+    brr_x11_state.use_shm = XShmQueryExtension(brr_x11_state.display);
 
     Window root_window = XRootWindow(brr_x11_state.display, brr_x11_state.screen);
     unsigned long attribmask = CWEventMask;
@@ -518,18 +523,36 @@ static void brr_x11_setup(){
 }
 
 static void brr_x11_dealloc_image(){
-    if (brr_x11_state.image){
-        XDestroyImage(brr_x11_state.image);
-        brr_x11_state.image = NULL;
-        brr_x11_state.buffer = NULL;
+    if (!brr_x11_state.image){
+        return;
     }
+    if (brr_x11_state.use_shm){
+        XSync(brr_x11_state.display, 0);
+        XShmDetach (brr_x11_state.display, &brr_x11_state.shminfo);
+        XDestroyImage (brr_x11_state.image);
+        shmdt (brr_x11_state.shminfo.shmaddr);
+        shmctl (brr_x11_state.shminfo.shmid, IPC_RMID, 0);
+    }else{
+        XDestroyImage(brr_x11_state.image);
+    }
+    brr_x11_state.image = NULL;
 }
 
 static void brr_x11_alloc_image(){
     brr_x11_dealloc_image();
-
-    brr_x11_state.buffer = malloc(brr_app.width * brr_app.height * BRR_BYTES_PER_PIXEL);
-    brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, (char*) brr_x11_state.buffer, brr_app.width, brr_app.height, 32, brr_app.width * BRR_BYTES_PER_PIXEL);
+    if (brr_x11_state.use_shm){
+        brr_x11_state.image = XShmCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, &brr_x11_state.shminfo, brr_app.width, brr_app.height);
+        brr_x11_state.shminfo.shmid = shmget (IPC_PRIVATE, brr_x11_state.image->bytes_per_line * brr_x11_state.image->height, IPC_CREAT|0777);
+        brr_x11_state.shminfo.shmaddr = brr_x11_state.image->data = shmat (brr_x11_state.shminfo.shmid, 0, 0);
+        brr_x11_state.shminfo.readOnly = 0;
+        if (!XShmAttach (brr_x11_state.display, &brr_x11_state.shminfo)){
+              printf("XShmAttach failed");
+              abort();
+        };
+    }else{
+        char *buffer = malloc(brr_app.width * brr_app.height * BRR_BYTES_PER_PIXEL);
+        brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, buffer, brr_app.width, brr_app.height, 32, brr_app.width * BRR_BYTES_PER_PIXEL);
+    }
 }
 
 static void brr_x11_fetch_events(){
@@ -965,12 +988,23 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
     while (brr_x11_state.is_running) {
         brr_x11_fetch_events();
         if (brr_app.frame_cb){
-        	brr_app.frame_cb(brr_x11_state.buffer, brr_app.width, brr_app.height);
+        	brr_app.frame_cb(brr_x11_state.image->data, brr_app.width, brr_app.height);
         }
-        XPutImage(brr_x11_state.display, brr_x11_state.window, brr_x11_state.gc, brr_x11_state.image,
-			0, 0,
-			0, 0,
-			brr_app.width, brr_app.height );
+        if (brr_x11_state.use_shm){
+            if(!XShmPutImage(brr_x11_state.display, brr_x11_state.window, brr_x11_state.gc, brr_x11_state.image,
+                0, 0,
+                0, 0,
+                brr_app.width, brr_app.height, 0)){
+                    printf("XShmPutImage() failed\n");
+                    abort();
+            };
+        }else{
+            XPutImage(brr_x11_state.display, brr_x11_state.window, brr_x11_state.gc, brr_x11_state.image,
+                0, 0,
+                0, 0,
+                brr_app.width, brr_app.height );
+           
+        }
         XFlush(brr_x11_state.display);
         brr_x11_framelock();
     }

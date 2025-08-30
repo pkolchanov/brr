@@ -47,7 +47,7 @@ int main(int argc, const char * argv[]) {
 gcc -x objective-c -framework Cocoa main.c -o main && ./main
 
 # linux
-gcc main.c -lX11 -o main && ./main
+gcc main.c -lX11 -lXext -o main && ./main
 
 # windows (MSVC)
 cl main.c && main.exe

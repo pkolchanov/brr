@@ -463,9 +463,13 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/XKBlib.h>
+
+#ifndef BRR_NO_SHARED_MEMORY
 #include <X11/extensions/XShm.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#endif
+
 #include <stdlib.h> // malloc, free
 #include <time.h> // clock_gettime, nanosleep
 
@@ -482,7 +486,9 @@ typedef struct brr_x11_state_t{
     XImage *image;
     uint64_t last_timestamp;
     int use_shm;
+    #ifndef BRR_NO_SHARED_MEMORY
     XShmSegmentInfo shminfo;
+    #endif
 } brr_x11_state_t;
 
 static brr_x11_state_t brr_x11_state;
@@ -500,8 +506,12 @@ static void brr_x11_setup(){
     if (brr_x11_state.depth < 24) {
         abort(); 
     }
+    brr_x11_state.use_shm = 0;
+    
+    #ifndef BRR_NO_SHARED_MEMORY
     brr_x11_state.use_shm = XShmQueryExtension(brr_x11_state.display);
-
+    #endif
+    
     Window root_window = XRootWindow(brr_x11_state.display, brr_x11_state.screen);
     unsigned long attribmask = CWEventMask;
     XSetWindowAttributes attribs;
@@ -527,11 +537,13 @@ static void brr_x11_dealloc_image(){
         return;
     }
     if (brr_x11_state.use_shm){
+        #ifndef BRR_NO_SHARED_MEMORY
         XSync(brr_x11_state.display, 0);
         XShmDetach (brr_x11_state.display, &brr_x11_state.shminfo);
         XDestroyImage (brr_x11_state.image);
         shmdt (brr_x11_state.shminfo.shmaddr);
         shmctl (brr_x11_state.shminfo.shmid, IPC_RMID, 0);
+        #endif
     }else{
         XDestroyImage(brr_x11_state.image);
     }
@@ -541,14 +553,16 @@ static void brr_x11_dealloc_image(){
 static void brr_x11_alloc_image(){
     brr_x11_dealloc_image();
     if (brr_x11_state.use_shm){
+        #ifndef BRR_NO_SHARED_MEMORY
         brr_x11_state.image = XShmCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, &brr_x11_state.shminfo, brr_app.width, brr_app.height);
-        brr_x11_state.shminfo.shmid = shmget (IPC_PRIVATE, brr_x11_state.image->bytes_per_line * brr_x11_state.image->height, IPC_CREAT|0777);
+        brr_x11_state.shminfo.shmid = shmget (IPC_PRIVATE, brr_x11_state.image->bytes_per_line * brr_x11_state.image->height, IPC_CREAT|0666);
         brr_x11_state.shminfo.shmaddr = brr_x11_state.image->data = shmat (brr_x11_state.shminfo.shmid, 0, 0);
         brr_x11_state.shminfo.readOnly = 0;
         if (!XShmAttach (brr_x11_state.display, &brr_x11_state.shminfo)){
               printf("XShmAttach failed");
               abort();
         };
+        #endif
     }else{
         char *buffer = malloc(brr_app.width * brr_app.height * BRR_BYTES_PER_PIXEL);
         brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, buffer, brr_app.width, brr_app.height, 32, brr_app.width * BRR_BYTES_PER_PIXEL);
@@ -988,9 +1002,10 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
     while (brr_x11_state.is_running) {
         brr_x11_fetch_events();
         if (brr_app.frame_cb){
-        	brr_app.frame_cb(brr_x11_state.image->data, brr_app.width, brr_app.height);
+        	brr_app.frame_cb((uint8_t*)brr_x11_state.image->data, brr_app.width, brr_app.height);
         }
         if (brr_x11_state.use_shm){
+            #ifndef BRR_NO_SHARED_MEMORY
             if(!XShmPutImage(brr_x11_state.display, brr_x11_state.window, brr_x11_state.gc, brr_x11_state.image,
                 0, 0,
                 0, 0,
@@ -998,6 +1013,7 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
                     printf("XShmPutImage() failed\n");
                     abort();
             };
+            #endif
         }else{
             XPutImage(brr_x11_state.display, brr_x11_state.window, brr_x11_state.gc, brr_x11_state.image,
                 0, 0,
@@ -1013,7 +1029,6 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
     XFreeGC(brr_x11_state.display, brr_x11_state.gc);
     XCloseDisplay(brr_x11_state.display);
 }
-
 
 // --------------------------------------------------------------------------------
 #elif defined(_WIN32)

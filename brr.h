@@ -14,7 +14,9 @@ enum{
 
 typedef enum brr_event_type{
     BRR_EV_KEYDOWN,
-    BRR_EV_KEYUP
+    BRR_EV_KEYUP,
+    BRR_EV_MOUSEDOWN,
+    BRR_EV_MOUSEUP
 } brr_event_type;
 
 // Source: GLFW keycodes
@@ -147,6 +149,8 @@ typedef enum brr_keycode{
 typedef struct brr_event{
     brr_event_type event_type;
     brr_keycode keycode;
+    float mouse_x;
+    float mouse_y;
 } brr_event;
 
 typedef struct brr_app_t {
@@ -186,6 +190,16 @@ static void brr_send_key_event(brr_event_type ev_type, brr_keycode keycode){
     memset(&brr_app.event, 0, sizeof(brr_event));
     brr_app.event.event_type = ev_type;
     brr_app.event.keycode = keycode;
+    if (brr_app.event_cb){
+        brr_app.event_cb(&brr_app.event);
+    }
+}
+
+static void brr_send_mouse_event(brr_event_type ev_type, float x, float y){
+    memset(&brr_app.event, 0, sizeof(brr_event));
+    brr_app.event.event_type = ev_type;
+    brr_app.event.mouse_x = x;
+    brr_app.event.mouse_y = y;
     if (brr_app.event_cb){
         brr_app.event_cb(&brr_app.event);
     }
@@ -338,10 +352,12 @@ static void brr_mac_init_keytable(void)
                                            backing:NSBackingStoreBuffered
                                              defer:NO];
 
-    BrrView *view = [[BrrView alloc] init];
+    BrrView *view = [[BrrView alloc] initWithFrame:[[window contentView] bounds]];
+    view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [window setContentView:view];
     [window setTitle:windowName];
     [window makeKeyAndOrderFront:nil];
+    [window makeFirstResponder:view];
 }
 
 - (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app {
@@ -354,9 +370,9 @@ static void brr_mac_init_keytable(void)
 @end
 
 @implementation BrrView
-- (instancetype)init
+- (instancetype)initWithFrame:(NSRect)frame
 {
-    self = [super init];
+    self = [super initWithFrame:frame];
     if (self) {
         colorSpaceRef = CGColorSpaceCreateDeviceRGB();
         // todo CADisplayLink or CVDisplayLink
@@ -412,7 +428,7 @@ static void brr_mac_init_keytable(void)
     }
     CGImageRef image = CGBitmapContextCreateImage(contextRef);
     CGContextRef ctx = [NSGraphicsContext currentContext].CGContext;
-    CGContextDrawImage(ctx, dirtyRect, image);
+    CGContextDrawImage(ctx, self.bounds, image);
     CGImageRelease(image);
 }
 
@@ -420,6 +436,7 @@ static void brr_mac_init_keytable(void)
     brr_app.width = newSize.width;
     brr_app.height = newSize.height;
     [self reallocBuffer];
+    [super setFrameSize:newSize];
 }
 
 -(void)reallocBuffer{
@@ -434,6 +451,19 @@ static void brr_mac_init_keytable(void)
     [self setNeedsDisplay:YES];
 }
 
+
+-(void)mouseDown:(NSEvent *)event{
+    NSPoint point = [event locationInWindow];
+    point = [self convertPoint:point fromView:nil];
+    brr_send_mouse_event(BRR_EV_MOUSEDOWN, point.x, ([self bounds].size.height- point.y));
+}
+
+-(void)mouseUp:(NSEvent *)event{
+    NSPoint point = [event locationInWindow];
+    point = [self convertPoint:point fromView:nil];
+    brr_send_mouse_event(BRR_EV_MOUSEUP,point.x, ([self bounds].size.height- point.y));
+}
+
 - (void)dealloc
 {
     [[self timer] invalidate];
@@ -446,6 +476,18 @@ static void brr_mac_init_keytable(void)
 - (BOOL)acceptsFirstResponder{
     return YES;
 }
+
+- (BOOL)acceptsFirstMouse{
+    return YES;
+}
+
+- (BOOL)isOpaque {
+    return YES;
+}
+- (BOOL)canBecomeKeyView {
+    return YES;
+}
+
 @end
 
 void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
@@ -515,7 +557,7 @@ static void brr_x11_setup(){
     Window root_window = XRootWindow(brr_x11_state.display, brr_x11_state.screen);
     unsigned long attribmask = CWEventMask;
     XSetWindowAttributes attribs;
-    attribs.event_mask = KeyPressMask| KeyReleaseMask | ExposureMask | StructureNotifyMask;
+    attribs.event_mask = KeyPressMask| KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | ExposureMask | StructureNotifyMask;
     brr_x11_state.window = XCreateWindow(brr_x11_state.display, root_window, 0, 0, brr_app.width, brr_app.height, 0, brr_x11_state.depth, InputOutput, brr_x11_state.visual, attribmask, &attribs );
     if (!brr_x11_state.window){
         abort();
@@ -584,6 +626,9 @@ static void brr_x11_fetch_events(){
         }
         if (brr_x11_state.event.type == KeyPress || brr_x11_state.event.type == KeyRelease) {
             brr_send_key_event(brr_x11_state.event.type == KeyPress ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, brr_app.keycodes[brr_x11_state.event.xkey.keycode]);
+        }
+        if (brr_x11_state.event.type == ButtonPress || brr_x11_state.event.type == ButtonRelease ){
+            brr_send_mouse_event(brr_x11_state.event.type == ButtonPress ? BRR_EV_MOUSEDOWN : BRR_EV_MOUSEUP, brr_x11_state.event.xbutton.x, brr_x11_state.event.xbutton.y);
         }
     }
 }
@@ -1033,6 +1078,7 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
 // --------------------------------------------------------------------------------
 #elif defined(_WIN32)
 #include <windows.h>
+#include <windowsx.h>
 #pragma comment (lib, "user32")
 #pragma comment (lib, "gdi32")
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS")
@@ -1249,8 +1295,13 @@ LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
         WORD keyFlags = HIWORD(lParam);
         int scancode = (keyFlags & (KF_EXTENDED | 0xff));
         BOOL isKeyReleased = (keyFlags & KF_UP) == KF_UP;
-       // TODO ALT 
         brr_send_key_event(isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN, brr_app.keycodes[scancode]);
+        return 0;
+    case WM_LBUTTONUP:
+    case WM_LBUTTONDOWN:
+        const float x  = (float)GET_X_LPARAM(lParam);
+        const float y = (float)GET_Y_LPARAM(lParam);
+        brr_send_mouse_event(uMsg == WM_LBUTTONUP ? BRR_EV_MOUSEUP : BRR_EV_MOUSEDOWN, x, y);
         return 0;
     default:
         break;

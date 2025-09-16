@@ -12,6 +12,16 @@ enum{
     BRR_MAX_KEYCODES = 512
 };
 
+typedef enum brr_event_modifier_flag{
+    BRR_MOD_SHIFT = 1 << 1,
+    BRR_MOD_CONTROL = 1 << 2,
+    BRR_MOD_ALT = 1 << 3,
+    BRR_MOD_SUPER = 1 << 4,
+    BRR_MOD_MOUSE_LEFT = 1 << 5 ,
+    BRR_MOD_MOUSE_RIGHT = 1 << 6,
+    BRR_MOD_MOUSE_MIDDLE = 1 << 7,
+} brr_event_modifier_flag;
+
 typedef enum brr_event_type{
     BRR_EV_KEYDOWN,
     BRR_EV_KEYUP,
@@ -146,9 +156,13 @@ typedef enum brr_keycode{
     BRR_KEY_MENU              = 348
 } brr_keycode;
 
+
+typedef uint32_t brr_event_modifier;
+
 typedef struct brr_event{
     brr_event_type event_type;
     brr_keycode keycode;
+    brr_event_modifier event_modifier;
     float mouse_x;
     float mouse_y;
 } brr_event;
@@ -186,20 +200,22 @@ static void brr_init_app(const char *window_name, int initial_width, int initial
     memset(&brr_app.event, 0, sizeof(brr_event));
 }
 
-static void brr_send_key_event(brr_event_type ev_type, brr_keycode keycode){
+static void brr_send_key_event(brr_event_type ev_type, brr_event_modifier ev_modifier, brr_keycode keycode){
     memset(&brr_app.event, 0, sizeof(brr_event));
     brr_app.event.event_type = ev_type;
     brr_app.event.keycode = keycode;
+    brr_app.event.event_modifier = ev_modifier;
     if (brr_app.event_cb){
         brr_app.event_cb(&brr_app.event);
     }
 }
 
-static void brr_send_mouse_event(brr_event_type ev_type, float x, float y){
+static void brr_send_mouse_event(brr_event_type ev_type, brr_event_modifier ev_modifier, float x, float y){
     memset(&brr_app.event, 0, sizeof(brr_event));
     brr_app.event.event_type = ev_type;
     brr_app.event.mouse_x = x;
     brr_app.event.mouse_y = y;
+    brr_app.event.event_modifier = ev_modifier;
     if (brr_app.event_cb){
         brr_app.event_cb(&brr_app.event);
     }
@@ -388,12 +404,39 @@ static void brr_mac_init_keytable(void)
     [self setNeedsDisplay:YES];
 }
 
+-(brr_event_modifier)getModifier:(NSEvent *)event{
+    brr_event_modifier result = 0;
+    NSUInteger b = [NSEvent pressedMouseButtons];
+    if (event.modifierFlags & NSEventModifierFlagShift){
+        result |= BRR_MOD_SHIFT;
+    }
+    if (event.modifierFlags & NSEventModifierFlagControl){
+        result |= BRR_MOD_CONTROL;
+    }
+    if (event.modifierFlags & NSEventModifierFlagOption){
+        result |= BRR_MOD_ALT;
+    }
+    if (event.modifierFlags & NSEventModifierFlagCommand){
+        result |= BRR_MOD_SUPER;
+    }
+    if (b & (1 << 0)){
+        result |= BRR_MOD_MOUSE_LEFT;
+    }
+    if (b & (1 << 1)){
+        result |= BRR_MOD_MOUSE_RIGHT;
+    }
+    if (b & (1 << 2)){
+        result |= BRR_MOD_MOUSE_MIDDLE;
+    }
+    return result;
+}
+
 - (void)keyDown:(NSEvent *)event{
-    brr_send_key_event(BRR_EV_KEYDOWN, brr_app.keycodes[event.keyCode]);
+    brr_send_key_event(BRR_EV_KEYDOWN, [self getModifier:event], brr_app.keycodes[event.keyCode]);
 }
 
 - (void)keyUp:(NSEvent *)event{
-    brr_send_key_event(BRR_EV_KEYUP, brr_app.keycodes[event.keyCode]);
+    brr_send_key_event(BRR_EV_KEYUP, [self getModifier:event], brr_app.keycodes[event.keyCode]);
 }
 
 - (void)flagsChanged:(NSEvent *)event {
@@ -417,7 +460,7 @@ static void brr_mac_init_keytable(void)
         down = 0 != (newFlags & NSEventModifierFlagCommand);
     }
     if (keyCode > 0){
-        brr_send_key_event(down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, keyCode);
+        brr_send_key_event(down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, [self getModifier:event], keyCode);
     }
     oldFlags = [event modifierFlags];
 }
@@ -455,13 +498,14 @@ static void brr_mac_init_keytable(void)
 -(void)mouseDown:(NSEvent *)event{
     NSPoint point = [event locationInWindow];
     point = [self convertPoint:point fromView:nil];
-    brr_send_mouse_event(BRR_EV_MOUSEDOWN, point.x, ([self bounds].size.height- point.y));
+    brr_send_mouse_event(BRR_EV_MOUSEDOWN, [self getModifier:event], point.x, ([self bounds].size.height- point.y));
 }
 
 -(void)mouseUp:(NSEvent *)event{
     NSPoint point = [event locationInWindow];
     point = [self convertPoint:point fromView:nil];
-    brr_send_mouse_event(BRR_EV_MOUSEUP,point.x, ([self bounds].size.height- point.y));
+    uint32_t modifier = [self getModifier:event];
+    brr_send_mouse_event(BRR_EV_MOUSEUP, [self getModifier:event], point.x, ([self bounds].size.height- point.y));
 }
 
 - (void)dealloc
@@ -601,14 +645,40 @@ static void brr_x11_alloc_image(){
         brr_x11_state.shminfo.shmaddr = brr_x11_state.image->data = shmat (brr_x11_state.shminfo.shmid, 0, 0);
         brr_x11_state.shminfo.readOnly = 0;
         if (!XShmAttach (brr_x11_state.display, &brr_x11_state.shminfo)){
-              printf("XShmAttach failed");
-              abort();
+            printf("XShmAttach failed");
+            abort();
         };
         #endif
     }else{
         char *buffer = malloc(brr_app.width * brr_app.height * BRR_BYTES_PER_PIXEL);
         brr_x11_state.image = XCreateImage(brr_x11_state.display, brr_x11_state.visual, brr_x11_state.depth, ZPixmap, 0, buffer, brr_app.width, brr_app.height, 32, brr_app.width * BRR_BYTES_PER_PIXEL);
     }
+}
+
+static brr_event_modifier brr_x11_get_modifier(uint32_t x11_modifier){
+    brr_event_modifier result = 0;
+    if (x11_modifier & ShiftMask){
+        result |= BRR_MOD_SHIFT;
+    }
+    if (x11_modifier & ControlMask){
+        result |= BRR_MOD_CONTROL;
+    }
+    if (x11_modifier & Mod1Mask){
+        result |= BRR_MOD_ALT;
+    }
+    if (x11_modifier & Mod4Mask){
+        result |= BRR_MOD_SUPER;
+    }
+    if (x11_modifier & Button1Mask){
+        result |= BRR_MOD_MOUSE_LEFT;
+    }
+    if (x11_modifier & Button2Mask){
+        result |= BRR_MOD_MOUSE_RIGHT;
+    }
+    if (x11_modifier & Button3Mask){
+        result |= BRR_MOD_MOUSE_MIDDLE;
+    }
+    return result;
 }
 
 static void brr_x11_fetch_events(){
@@ -625,10 +695,10 @@ static void brr_x11_fetch_events(){
             brr_x11_alloc_image();
         }
         if (brr_x11_state.event.type == KeyPress || brr_x11_state.event.type == KeyRelease) {
-            brr_send_key_event(brr_x11_state.event.type == KeyPress ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, brr_app.keycodes[brr_x11_state.event.xkey.keycode]);
+            brr_send_key_event(brr_x11_state.event.type == KeyPress ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, brr_x11_get_modifier(brr_x11_state.event.xkey.state), brr_app.keycodes[brr_x11_state.event.xkey.keycode]);
         }
         if (brr_x11_state.event.type == ButtonPress || brr_x11_state.event.type == ButtonRelease ){
-            brr_send_mouse_event(brr_x11_state.event.type == ButtonPress ? BRR_EV_MOUSEDOWN : BRR_EV_MOUSEUP, brr_x11_state.event.xbutton.x, brr_x11_state.event.xbutton.y);
+            brr_send_mouse_event(brr_x11_state.event.type == ButtonPress ? BRR_EV_MOUSEDOWN : BRR_EV_MOUSEUP, brr_x11_get_modifier(brr_x11_state.event.xbutton.state), brr_x11_state.event.xbutton.x, brr_x11_state.event.xbutton.y);
         }
     }
 }
@@ -1117,6 +1187,34 @@ static void brr_windows_set_dimensions(int width, int height){
     brr_windows_realloc_buffer();
 }
 
+
+static brr_event_modifier brr_windows_get_modifier(){
+    brr_event_modifier result = 0;
+    if (GetKeyState(VK_SHIFT) & (1<<15)){
+        result |= BRR_MOD_SHIFT;
+    }
+    if (GetKeyState(VK_CONTROL) & (1<<15)){
+        result |= BRR_MOD_CONTROL;
+    }
+    if (GetKeyState(VK_MENU) & (1<<15)){
+        result |= BRR_MOD_ALT;
+    }
+    if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & (1<<15)){
+        result |= BRR_MOD_SUPER;
+    }
+    if (GetSystemMetrics( SM_SWAPBUTTON ))
+    {
+        if (GetAsyncKeyState(VK_RBUTTON) & 0x80) result |= BRR_MOD_MOUSE_LEFT;
+        if (GetAsyncKeyState(VK_LBUTTON) & 0x80) result |= BRR_MOD_MOUSE_RIGHT;
+    }
+    else
+    {
+        if (GetAsyncKeyState(VK_LBUTTON) & 0x80) result |= BRR_MOD_MOUSE_LEFT;
+        if (GetAsyncKeyState(VK_RBUTTON) & 0x80) result |= BRR_MOD_MOUSE_RIGHT;
+    }
+    return result;
+}
+
 // glfw/src/win32_init.c
 static void brr_windows_init_keytable(void){
     brr_app.keycodes[0x00B] = BRR_KEY_0;
@@ -1295,13 +1393,17 @@ LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
         WORD keyFlags = HIWORD(lParam);
         int scancode = (keyFlags & (KF_EXTENDED | 0xff));
         BOOL isKeyReleased = (keyFlags & KF_UP) == KF_UP;
-        brr_send_key_event(isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN, brr_app.keycodes[scancode]);
+        brr_send_key_event(isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN, brr_windows_get_modifier(), brr_app.keycodes[scancode]);
         return 0;
     case WM_LBUTTONUP:
     case WM_LBUTTONDOWN:
-        const float x  = (float)GET_X_LPARAM(lParam);
+    case WM_RBUTTONUP:
+    case WM_RBUTTONDOWN:
+    case WM_MBUTTONUP:
+    case WM_MBUTTONDOWN:
+        const float x = (float)GET_X_LPARAM(lParam);
         const float y = (float)GET_Y_LPARAM(lParam);
-        brr_send_mouse_event(uMsg == WM_LBUTTONUP ? BRR_EV_MOUSEUP : BRR_EV_MOUSEDOWN, x, y);
+        brr_send_mouse_event(uMsg == WM_LBUTTONUP ? BRR_EV_MOUSEUP : BRR_EV_MOUSEDOWN, brr_windows_get_modifier(), x, y);
         return 0;
     default:
         break;

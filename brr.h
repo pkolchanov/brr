@@ -162,6 +162,7 @@ typedef uint32_t brr_event_modifier;
 typedef struct brr_event{
     brr_event_type event_type;
     brr_keycode keycode;
+    int key_repeat;
     brr_event_modifier event_modifier;
     float mouse_x;
     float mouse_y;
@@ -200,11 +201,12 @@ static void brr_init_app(const char *window_name, int initial_width, int initial
     memset(&brr_app.event, 0, sizeof(brr_event));
 }
 
-static void brr_send_key_event(brr_event_type ev_type, brr_event_modifier ev_modifier, brr_keycode keycode){
+static void brr_send_key_event(brr_event_type ev_type, brr_event_modifier ev_modifier, int repeat, brr_keycode keycode){
     memset(&brr_app.event, 0, sizeof(brr_event));
     brr_app.event.event_type = ev_type;
     brr_app.event.keycode = keycode;
     brr_app.event.event_modifier = ev_modifier;
+    brr_app.event.key_repeat = repeat;
     if (brr_app.event_cb){
         brr_app.event_cb(&brr_app.event);
     }
@@ -432,11 +434,11 @@ static void brr_mac_init_keytable(void)
 }
 
 - (void)keyDown:(NSEvent *)event{
-    brr_send_key_event(BRR_EV_KEYDOWN, [self getModifier:event], brr_app.keycodes[event.keyCode]);
+    brr_send_key_event(BRR_EV_KEYDOWN, [self getModifier:event],  [event isARepeat] ? 1 : 0, brr_app.keycodes[event.keyCode]);
 }
 
 - (void)keyUp:(NSEvent *)event{
-    brr_send_key_event(BRR_EV_KEYUP, [self getModifier:event], brr_app.keycodes[event.keyCode]);
+    brr_send_key_event(BRR_EV_KEYUP, [self getModifier:event],  [event isARepeat] ? 1 : 0, brr_app.keycodes[event.keyCode]);
 }
 
 - (void)flagsChanged:(NSEvent *)event {
@@ -460,7 +462,7 @@ static void brr_mac_init_keytable(void)
         down = 0 != (newFlags & NSEventModifierFlagCommand);
     }
     if (keyCode > 0){
-        brr_send_key_event(down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, [self getModifier:event], keyCode);
+        brr_send_key_event(down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, [event isARepeat] ? 1 : 0 , [self getModifier:event], keyCode);
     }
     oldFlags = [event modifierFlags];
 }
@@ -571,6 +573,7 @@ typedef struct brr_x11_state_t{
     Atom wm_delete_window;
     XImage *image;
     uint64_t last_timestamp;
+    int key_down[BRR_MAX_KEYCODES];
     int use_shm;
     #ifndef BRR_NO_SHARED_MEMORY
     XShmSegmentInfo shminfo;
@@ -586,6 +589,7 @@ static void brr_x11_setup(){
     if (!brr_x11_state.display){
         abort();
     }
+    XkbSetDetectableAutoRepeat(brr_x11_state.display, 1, NULL);
     brr_x11_state.screen = DefaultScreen(brr_x11_state.display);
     brr_x11_state.depth = DefaultDepth(brr_x11_state.display, brr_x11_state.screen);
     brr_x11_state.visual = DefaultVisual(brr_x11_state.display, brr_x11_state.screen);
@@ -610,7 +614,6 @@ static void brr_x11_setup(){
     XStoreName(brr_x11_state.display, brr_x11_state.window, brr_app.window_name);
     brr_x11_state.wm_delete_window = XInternAtom(brr_x11_state.display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(brr_x11_state.display, brr_x11_state.window, &brr_x11_state.wm_delete_window, 1);
-
 
     XGCValues xgcvalues;
     int valuemask = GCGraphicsExposures;
@@ -695,7 +698,9 @@ static void brr_x11_fetch_events(){
             brr_x11_alloc_image();
         }
         if (brr_x11_state.event.type == KeyPress || brr_x11_state.event.type == KeyRelease) {
-            brr_send_key_event(brr_x11_state.event.type == KeyPress ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, brr_x11_get_modifier(brr_x11_state.event.xkey.state), brr_app.keycodes[brr_x11_state.event.xkey.keycode]);
+            int repeat = brr_x11_state.key_down[brr_x11_state.event.xkey.keycode];
+            brr_x11_state.key_down[brr_x11_state.event.xkey.keycode] = brr_x11_state.event.type == KeyPress ? 1 : 0;
+            brr_send_key_event(brr_x11_state.event.type == KeyPress ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, brr_x11_get_modifier(brr_x11_state.event.xkey.state), repeat, brr_app.keycodes[brr_x11_state.event.xkey.keycode]);
         }
         if (brr_x11_state.event.type == ButtonPress || brr_x11_state.event.type == ButtonRelease ){
             brr_send_mouse_event(brr_x11_state.event.type == ButtonPress ? BRR_EV_MOUSEDOWN : BRR_EV_MOUSEUP, brr_x11_get_modifier(brr_x11_state.event.xbutton.state), brr_x11_state.event.xbutton.x, brr_x11_state.event.xbutton.y);
@@ -1393,7 +1398,8 @@ LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
         WORD keyFlags = HIWORD(lParam);
         int scancode = (keyFlags & (KF_EXTENDED | 0xff));
         BOOL isKeyReleased = (keyFlags & KF_UP) == KF_UP;
-        brr_send_key_event(isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN, brr_windows_get_modifier(), brr_app.keycodes[scancode]);
+        BOOL isRepeat = (lParam & (1 << 30)) != 0;
+        brr_send_key_event(isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN, brr_windows_get_modifier(), isRepeat ? 1 : 0, brr_app.keycodes[scancode]);
         return 0;
     case WM_LBUTTONUP:
     case WM_LBUTTONDOWN:

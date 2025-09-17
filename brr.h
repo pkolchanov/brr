@@ -12,6 +12,8 @@ enum{
     BRR_MAX_KEYCODES = 512
 };
 
+typedef uint32_t brr_event_modifier;
+
 typedef enum brr_event_modifier_flag{
     BRR_MOD_SHIFT = 1 << 1,
     BRR_MOD_CONTROL = 1 << 2,
@@ -29,7 +31,7 @@ typedef enum brr_event_type{
     BRR_EV_MOUSEUP
 } brr_event_type;
 
-// Source: GLFW keycodes
+// Source: glfw/include/GLFW/glfw3.h
 typedef enum brr_keycode{
 	BRR_KEY_UNKNOWN           =  0,
     BRR_KEY_SPACE             = 32,
@@ -155,9 +157,6 @@ typedef enum brr_keycode{
     BRR_KEY_RIGHT_SUPER       = 347,
     BRR_KEY_MENU              = 348
 } brr_keycode;
-
-
-typedef uint32_t brr_event_modifier;
 
 typedef struct brr_event{
     brr_event_type event_type;
@@ -462,7 +461,7 @@ static void brr_mac_init_keytable(void)
         down = 0 != (newFlags & NSEventModifierFlagCommand);
     }
     if (keyCode > 0){
-        brr_send_key_event(down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, [event isARepeat] ? 1 : 0 , [self getModifier:event], keyCode);
+        brr_send_key_event(down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, [self getModifier:event], [event isARepeat] ? 1 : 0,  keyCode);
     }
     oldFlags = [event modifierFlags];
 }
@@ -676,10 +675,10 @@ static brr_event_modifier brr_x11_get_modifier(uint32_t x11_modifier){
         result |= BRR_MOD_MOUSE_LEFT;
     }
     if (x11_modifier & Button2Mask){
-        result |= BRR_MOD_MOUSE_RIGHT;
+        result |= BRR_MOD_MOUSE_MIDDLE;
     }
     if (x11_modifier & Button3Mask){
-        result |= BRR_MOD_MOUSE_MIDDLE;
+        result |= BRR_MOD_MOUSE_RIGHT;
     }
     return result;
 }
@@ -910,9 +909,9 @@ static int brr_x11_translateKeySyms(const KeySym* keysyms, int width)
     return BRR_KEY_UNKNOWN;
 }
 
+// Source: glfw/src/x11_init.c
 static void brr_x11_init_keytable(void)
 {
-	// source: GLFW
     XkbDescPtr desc = XkbGetMap(brr_x11_state.display, 0, XkbUseCoreKbd);
     XkbGetNames(brr_x11_state.display, XkbKeyNamesMask | XkbKeyAliasesMask, desc);
     int scancodeMin = desc->min_key_code;
@@ -1220,7 +1219,7 @@ static brr_event_modifier brr_windows_get_modifier(){
     return result;
 }
 
-// glfw/src/win32_init.c
+// Source: glfw/src/win32_init.c
 static void brr_windows_init_keytable(void){
     brr_app.keycodes[0x00B] = BRR_KEY_0;
     brr_app.keycodes[0x002] = BRR_KEY_1;

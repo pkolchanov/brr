@@ -441,7 +441,7 @@ static void brr_mac_init_keytable(void)
 }
 
 - (void)flagsChanged:(NSEvent *)event {
-    Boolean down = NO;
+    BOOL down = NO;
     brr_keycode keyCode = BRR_KEY_UNKNOWN;
     NSEventModifierFlags newFlags = [event modifierFlags];
     if ((oldFlags ^ newFlags) & NSEventModifierFlagShift) {
@@ -461,7 +461,7 @@ static void brr_mac_init_keytable(void)
         down = 0 != (newFlags & NSEventModifierFlagCommand);
     }
     if (keyCode > 0){
-        brr_send_key_event(down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, [self getModifier:event], [event isARepeat] ? 1 : 0,  keyCode);
+        brr_send_key_event(down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, [self getModifier:event], 0,  keyCode);
     }
     oldFlags = [event modifierFlags];
 }
@@ -515,7 +515,6 @@ static void brr_mac_init_keytable(void)
     CGColorSpaceRelease(colorSpaceRef);
     CGContextRelease(contextRef);
     free(buffer);
-    [super dealloc];
 }
 
 - (BOOL)acceptsFirstResponder{

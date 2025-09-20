@@ -682,6 +682,26 @@ static brr_event_modifier brr_x11_get_modifier(uint32_t x11_modifier){
     return result;
 }
 
+static brr_event_modifier brr_x11_key_to_modifier(brr_keycode keycode){
+    switch (keycode){
+        case BRR_KEY_LEFT_SHIFT:
+        case BRR_KEY_RIGHT_SHIFT:
+            return BRR_MOD_SHIFT;
+        case BRR_KEY_LEFT_CONTROL:
+        case BRR_KEY_RIGHT_CONTROL:
+            return BRR_MOD_CONTROL;
+        case BRR_KEY_LEFT_ALT:
+        case BRR_KEY_RIGHT_ALT:
+            return BRR_MOD_ALT;
+        case BRR_KEY_LEFT_SUPER:
+        case BRR_KEY_RIGHT_SUPER:
+            return BRR_MOD_SUPER;
+        default:
+            break;
+    }
+    return 0;
+}
+
 static void brr_x11_fetch_events(){
     while (XPending(brr_x11_state.display)){
         XNextEvent(brr_x11_state.display, &brr_x11_state.event);
@@ -696,9 +716,18 @@ static void brr_x11_fetch_events(){
             brr_x11_alloc_image();
         }
         if (brr_x11_state.event.type == KeyPress || brr_x11_state.event.type == KeyRelease) {
-            int repeat = brr_x11_state.key_down[brr_x11_state.event.xkey.keycode];
+            brr_keycode keycode = brr_app.keycodes[brr_x11_state.event.xkey.keycode];
+            brr_event_modifier modifier = brr_x11_get_modifier(brr_x11_state.event.xkey.state);
+            brr_event_modifier_flag flag = brr_x11_key_to_modifier(keycode);
+            if (brr_x11_state.event.type == KeyPress){
+                int repeat = brr_x11_state.key_down[brr_x11_state.event.xkey.keycode];
+                modifier |= flag;
+                brr_send_key_event(BRR_EV_KEYDOWN, modifier, repeat, keycode);
+            }else{
+                modifier &= ~flag;
+                brr_send_key_event(BRR_EV_KEYUP, modifier, 0, keycode);
+            }
             brr_x11_state.key_down[brr_x11_state.event.xkey.keycode] = brr_x11_state.event.type == KeyPress ? 1 : 0;
-            brr_send_key_event(brr_x11_state.event.type == KeyPress ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, brr_x11_get_modifier(brr_x11_state.event.xkey.state), repeat, brr_app.keycodes[brr_x11_state.event.xkey.keycode]);
         }
         if (brr_x11_state.event.type == ButtonPress || brr_x11_state.event.type == ButtonRelease ){
             brr_send_mouse_event(brr_x11_state.event.type == ButtonPress ? BRR_EV_MOUSEDOWN : BRR_EV_MOUSEUP, brr_x11_get_modifier(brr_x11_state.event.xbutton.state), brr_x11_state.event.xbutton.x, brr_x11_state.event.xbutton.y);

@@ -496,17 +496,34 @@ static void brr_mac_init_keytable(void)
 }
 
 
--(void)mouseDown:(NSEvent *)event{
+-(void)handleMouseEvent:(NSEvent *)event brrEvent:(brr_event_type)brr_ev{
     NSPoint point = [event locationInWindow];
     point = [self convertPoint:point fromView:nil];
-    brr_send_mouse_event(BRR_EV_MOUSEDOWN, [self getModifier:event], point.x, ([self bounds].size.height- point.y));
+    brr_send_mouse_event(brr_ev, [self getModifier:event], point.x, ([self bounds].size.height - point.y));
+}
+
+-(void)mouseDown:(NSEvent *)event{
+    [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEDOWN];
 }
 
 -(void)mouseUp:(NSEvent *)event{
-    NSPoint point = [event locationInWindow];
-    point = [self convertPoint:point fromView:nil];
-    uint32_t modifier = [self getModifier:event];
-    brr_send_mouse_event(BRR_EV_MOUSEUP, [self getModifier:event], point.x, ([self bounds].size.height- point.y));
+    [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEUP];
+}
+
+-(void)rightMouseDown:(NSEvent *)event{
+    [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEDOWN];
+}
+
+-(void)rightMouseUp:(NSEvent *)event{
+    [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEUP];
+}
+
+-(void)otherMouseDown:(NSEvent *)event{
+    [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEDOWN];
+}
+
+-(void)otherMouseUp:(NSEvent *)event{
+    [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEUP];
 }
 
 - (void)dealloc

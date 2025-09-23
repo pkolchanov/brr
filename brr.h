@@ -222,6 +222,13 @@ static void brr_send_mouse_event(brr_event_type ev_type, brr_event_modifier ev_m
     }
 }
 
+static brr_keycode brr_get_keycode(int scancode){
+    if (scancode < 0 || scancode > BRR_MAX_KEYCODES){
+        return BRR_KEY_UNKNOWN;
+    }
+    return brr_app.keycodes[scancode];
+}
+
 #if defined(__APPLE__)
 #import <Cocoa/Cocoa.h>
 
@@ -433,11 +440,11 @@ static void brr_mac_init_keytable(void)
 }
 
 - (void)keyDown:(NSEvent *)event{
-    brr_send_key_event(BRR_EV_KEYDOWN, [self getModifier:event],  [event isARepeat] ? 1 : 0, brr_app.keycodes[event.keyCode]);
+    brr_send_key_event(BRR_EV_KEYDOWN, [self getModifier:event], [event isARepeat] ? 1 : 0, brr_get_keycode(event.keyCode));
 }
 
 - (void)keyUp:(NSEvent *)event{
-    brr_send_key_event(BRR_EV_KEYUP, [self getModifier:event],  [event isARepeat] ? 1 : 0, brr_app.keycodes[event.keyCode]);
+    brr_send_key_event(BRR_EV_KEYUP, [self getModifier:event], [event isARepeat] ? 1 : 0, brr_get_keycode(event.keyCode));
 }
 
 - (void)flagsChanged:(NSEvent *)event {
@@ -461,7 +468,7 @@ static void brr_mac_init_keytable(void)
         down = 0 != (newFlags & NSEventModifierFlagCommand);
     }
     if (keyCode > 0){
-        brr_send_key_event(down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, [self getModifier:event], 0,  keyCode);
+        brr_send_key_event(down ? BRR_EV_KEYDOWN : BRR_EV_KEYUP, [self getModifier:event], 0, keyCode);
     }
     oldFlags = [event modifierFlags];
 }
@@ -747,7 +754,7 @@ static void brr_x11_fetch_events(){
             brr_x11_alloc_image();
         }
         if (brr_x11_state.event.type == KeyPress || brr_x11_state.event.type == KeyRelease) {
-            brr_keycode keycode = brr_app.keycodes[brr_x11_state.event.xkey.keycode];
+            brr_keycode keycode = brr_get_keycode(brr_x11_state.event.xkey.keycode);
             brr_event_modifier modifier = brr_x11_get_modifier(brr_x11_state.event.xkey.state);
             brr_event_modifier_flag flag = brr_x11_key_to_modifier(keycode);
             if (brr_x11_state.event.type == KeyPress){
@@ -1473,7 +1480,8 @@ LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
         int scancode = (keyFlags & (KF_EXTENDED | 0xff));
         BOOL isKeyReleased = (keyFlags & KF_UP) == KF_UP;
         BOOL isRepeat = (lParam & (1 << 30)) != 0;
-        brr_send_key_event(isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN, brr_windows_get_modifier(), isRepeat ? 1 : 0, brr_app.keycodes[scancode]);
+        
+        brr_send_key_event(isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN, brr_windows_get_modifier(), isRepeat ? 1 : 0, brr_get_keycode(scancode));
         return 0;
     case WM_LBUTTONUP:
     case WM_RBUTTONUP:

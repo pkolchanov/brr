@@ -1274,15 +1274,16 @@ static brr_event_modifier brr_windows_get_modifier(){
     if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & (1<<15)){
         result |= BRR_MOD_SUPER;
     }
-    if (GetSystemMetrics( SM_SWAPBUTTON ))
-    {
-        if (GetAsyncKeyState(VK_RBUTTON) & 0x80) result |= BRR_MOD_MOUSE_LEFT;
-        if (GetAsyncKeyState(VK_LBUTTON) & 0x80) result |= BRR_MOD_MOUSE_RIGHT;
+
+    int swap = GetSystemMetrics( SM_SWAPBUTTON );
+    if (GetAsyncKeyState(VK_LBUTTON)) {
+        result |= swap ? BRR_MOD_MOUSE_RIGHT : BRR_MOD_MOUSE_LEFT;
     }
-    else
-    {
-        if (GetAsyncKeyState(VK_LBUTTON) & 0x80) result |= BRR_MOD_MOUSE_LEFT;
-        if (GetAsyncKeyState(VK_RBUTTON) & 0x80) result |= BRR_MOD_MOUSE_RIGHT;
+    if (GetAsyncKeyState(VK_RBUTTON)) {
+        result |= swap ? BRR_MOD_MOUSE_LEFT : BRR_MOD_MOUSE_RIGHT;
+    }
+    if (GetAsyncKeyState(VK_MBUTTON)) {
+        result |= BRR_MOD_MOUSE_MIDDLE;
     }
     return result;
 }
@@ -1431,6 +1432,12 @@ static void brr_windows_setup(){
     QueryPerformanceFrequency(&brr_windows_state.freq);
 }
 
+static void brr_windows_handle_mouse_event(brr_event_type ev_type, LPARAM lParam){
+    const float x = (float)GET_X_LPARAM(lParam);
+    const float y = (float)GET_Y_LPARAM(lParam);
+    brr_send_mouse_event(ev_type, brr_windows_get_modifier(), x, y);
+}
+
 LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg)
     {
@@ -1469,14 +1476,14 @@ LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
         brr_send_key_event(isKeyReleased ? BRR_EV_KEYUP : BRR_EV_KEYDOWN, brr_windows_get_modifier(), isRepeat ? 1 : 0, brr_app.keycodes[scancode]);
         return 0;
     case WM_LBUTTONUP:
-    case WM_LBUTTONDOWN:
     case WM_RBUTTONUP:
-    case WM_RBUTTONDOWN:
     case WM_MBUTTONUP:
+        brr_windows_handle_mouse_event(BRR_EV_MOUSEUP, lParam);
+        return 0;
+    case WM_LBUTTONDOWN:
+    case WM_RBUTTONDOWN:
     case WM_MBUTTONDOWN:
-        const float x = (float)GET_X_LPARAM(lParam);
-        const float y = (float)GET_Y_LPARAM(lParam);
-        brr_send_mouse_event(uMsg == WM_LBUTTONUP ? BRR_EV_MOUSEUP : BRR_EV_MOUSEDOWN, brr_windows_get_modifier(), x, y);
+        brr_windows_handle_mouse_event(BRR_EV_MOUSEDOWN, lParam);
         return 0;
     default:
         break;

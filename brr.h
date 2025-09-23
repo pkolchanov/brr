@@ -719,6 +719,20 @@ static brr_event_modifier brr_x11_key_to_modifier(brr_keycode keycode){
     return 0;
 }
 
+static brr_event_modifier brr_x11_button_to_modifier(int button){
+     switch (button) {
+        case Button1:
+            return BRR_MOD_MOUSE_LEFT;
+        case Button2:
+            return BRR_MOD_MOUSE_MIDDLE;
+        case Button3:
+            return BRR_MOD_MOUSE_RIGHT;
+        default:
+            break;
+    }
+    return 0;
+}
+
 static void brr_x11_fetch_events(){
     while (XPending(brr_x11_state.display)){
         XNextEvent(brr_x11_state.display, &brr_x11_state.event);
@@ -747,7 +761,16 @@ static void brr_x11_fetch_events(){
             brr_x11_state.key_down[brr_x11_state.event.xkey.keycode] = brr_x11_state.event.type == KeyPress ? 1 : 0;
         }
         if (brr_x11_state.event.type == ButtonPress || brr_x11_state.event.type == ButtonRelease ){
-            brr_send_mouse_event(brr_x11_state.event.type == ButtonPress ? BRR_EV_MOUSEDOWN : BRR_EV_MOUSEUP, brr_x11_get_modifier(brr_x11_state.event.xbutton.state), brr_x11_state.event.xbutton.x, brr_x11_state.event.xbutton.y);
+            brr_event_modifier modifier = brr_x11_get_modifier(brr_x11_state.event.xbutton.state);
+            brr_event_modifier_flag button_flag = brr_x11_button_to_modifier(brr_x11_state.event.xbutton.button);
+            if (brr_x11_state.event.type == ButtonPress){
+                modifier |= button_flag;
+                brr_send_mouse_event(BRR_EV_MOUSEDOWN, modifier, brr_x11_state.event.xbutton.x, brr_x11_state.event.xbutton.y);
+            } else{
+                modifier &= ~button_flag;
+                brr_send_mouse_event(BRR_EV_MOUSEUP, modifier, brr_x11_state.event.xbutton.x, brr_x11_state.event.xbutton.y);
+            }
+            
         }
     }
 }

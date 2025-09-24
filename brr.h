@@ -35,7 +35,8 @@ typedef enum brr_event_type{
     BRR_EV_KEYDOWN,
     BRR_EV_KEYUP,
     BRR_EV_MOUSEDOWN,
-    BRR_EV_MOUSEUP
+    BRR_EV_MOUSEUP,
+    BRR_EV_MOUSEMOVED
 } brr_event_type;
 
 // Source: glfw/include/GLFW/glfw3.h
@@ -196,6 +197,7 @@ void brr_start(const char* window_name, int initial_width, int initial_height, v
 #ifdef BRR_IMPLEMENTATION
 #include <stdio.h>  // printf
 #include <string.h> // memset
+
 static brr_app_t brr_app;
 
 static void brr_init_app(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *)){
@@ -359,7 +361,6 @@ static void brr_mac_init_keytable(void)
     brr_app.keycodes[0x4E] = BRR_KEY_KP_SUBTRACT;
 }
 
-
 @interface BrrAppDelegate : NSObject <NSApplicationDelegate>{
     NSWindow *window;
 }
@@ -384,7 +385,7 @@ static void brr_mac_init_keytable(void)
                                                     NSWindowStyleMaskResizable)
                                            backing:NSBackingStoreBuffered
                                              defer:NO];
-
+    [window setAcceptsMouseMovedEvents:YES];
     BrrView *view = [[BrrView alloc] initWithFrame:[[window contentView] bounds]];
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [window setContentView:view];
@@ -542,6 +543,14 @@ static void brr_mac_init_keytable(void)
     [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEUP brrMouseButton:BRR_MOUSE_BUTTON_OTHER];
 }
 
+-(void)mouseMoved:(NSEvent*)event{
+     [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEMOVED brrMouseButton:BRR_MOUSE_BUTTON_OTHER];
+}
+
+-(void)mouseDragged:(NSEvent*)event{
+     [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEMOVED brrMouseButton:BRR_MOUSE_BUTTON_OTHER];
+}
+
 - (void)dealloc
 {
     [[self timer] invalidate];
@@ -636,7 +645,7 @@ static void brr_x11_setup(){
     Window root_window = XRootWindow(brr_x11_state.display, brr_x11_state.screen);
     unsigned long attribmask = CWEventMask;
     XSetWindowAttributes attribs;
-    attribs.event_mask = KeyPressMask| KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | ExposureMask | StructureNotifyMask;
+    attribs.event_mask = KeyPressMask| KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | ExposureMask | StructureNotifyMask;
     brr_x11_state.window = XCreateWindow(brr_x11_state.display, root_window, 0, 0, brr_app.width, brr_app.height, 0, brr_x11_state.depth, InputOutput, brr_x11_state.visual, attribmask, &attribs );
     if (!brr_x11_state.window){
         abort();
@@ -801,7 +810,10 @@ static void brr_x11_fetch_events(){
                 modifier &= ~button_flag;
                 brr_send_mouse_event(BRR_EV_MOUSEUP, mouse_button, modifier, brr_x11_state.event.xbutton.x, brr_x11_state.event.xbutton.y);
             }
-            
+        }
+        if (brr_x11_state.event.type == MotionNotify){
+            brr_event_modifier modifier = brr_x11_get_modifier(brr_x11_state.event.xmotion.state);
+            brr_send_mouse_event(BRR_EV_MOUSEMOVED, BRR_MOUSE_BUTTON_OTHER, modifier, brr_x11_state.event.xmotion.x, brr_x11_state.event.xmotion.y);
         }
     }
 }
@@ -1522,6 +1534,9 @@ LRESULT CALLBACK brr_windows_winproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
         return 0;
     case WM_MBUTTONDOWN:
         brr_windows_handle_mouse_event(BRR_EV_MOUSEDOWN, BRR_MOUSE_BUTTON_MIDDLE, lParam);
+        return 0;
+    case WM_MOUSEMOVE:
+        brr_windows_handle_mouse_event(BRR_EV_MOUSEMOVED, BRR_MOUSE_BUTTON_OTHER, lParam);
         return 0;
     default:
         break;

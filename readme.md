@@ -1,9 +1,9 @@
 # brr.h
 
 brr.h is a single-header application wrapper for software rendering apps. 
-— No dependencies on GPU graphics APIs such as OpenGL or DirectX.
-— A minimal API with two callbacks for frame rendering and event handling.
-— Supports macOS (Core Graphics), Linux (x11), and Windows (GDI). 
+* No dependencies on 3D graphics APIs such as OpenGL or DirectX.
+* A minimal API with callbacks for frame rendering and event handling.
+* Supports macOS (Core Graphics), Linux (x11), and Windows (GDI). 
 
 
 ## Minimal example
@@ -20,9 +20,9 @@ void frame(uint8_t *buffer, int width, int height){
 
     int idx = 0;
     while (idx < width * height * BRR_BYTES_PER_PIXEL){
-        buffer[idx]     = 0;       // BLUE
-        buffer[idx + 1] = 0;       // GREEN
-        buffer[idx + 2] = r % 255; // RED
+        buffer[idx]     = 0;       // Blue
+        buffer[idx + 1] = 0;       // Green
+        buffer[idx + 2] = r % 255; // Red
         
         idx += BRR_BYTES_PER_PIXEL;
     }

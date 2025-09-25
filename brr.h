@@ -410,6 +410,7 @@ static void brr_mac_init_keytable(void)
     self = [super initWithFrame:frame];
     if (self) {
         colorSpaceRef = CGColorSpaceCreateDeviceRGB();
+        [self reallocBuffer];
         // todo CADisplayLink or CVDisplayLink
         _timer = [NSTimer scheduledTimerWithTimeInterval: 1.0/BRR_FPS
                         target: self

@@ -47,7 +47,7 @@ int main(int argc, const char * argv[]) {
 
 ```
 
-## Build 
+#### Build 
 ```bash
 # macOS
 gcc -x objective-c -framework Cocoa main.c -o main && ./main

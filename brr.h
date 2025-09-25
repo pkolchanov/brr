@@ -387,6 +387,7 @@ static void brr_mac_init_keytable(void)
                                              defer:NO];
     [window setAcceptsMouseMovedEvents:YES];
     BrrView *view = [[BrrView alloc] initWithFrame:[[window contentView] bounds]];
+    [view setWantsLayer:YES];
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [window setContentView:view];
     [window setTitle:windowName];
@@ -483,13 +484,12 @@ static void brr_mac_init_keytable(void)
     oldFlags = [event modifierFlags];
 }
 
-- (void)drawRect:(NSRect)dirtyRect{
+-(void)updateLayer{
     if (brr_app.frame_cb) {
         brr_app.frame_cb(buffer, brr_app.width, brr_app.height);
     }
     CGImageRef image = CGBitmapContextCreateImage(contextRef);
-    CGContextRef ctx = [NSGraphicsContext currentContext].CGContext;
-    CGContextDrawImage(ctx, self.bounds, image);
+    [[self layer] setContents:(__bridge id)image];
     CGImageRelease(image);
 }
 
@@ -544,11 +544,11 @@ static void brr_mac_init_keytable(void)
 }
 
 -(void)mouseMoved:(NSEvent*)event{
-     [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEMOVED brrMouseButton:BRR_MOUSE_BUTTON_OTHER];
+    [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEMOVED brrMouseButton:BRR_MOUSE_BUTTON_OTHER];
 }
 
 -(void)mouseDragged:(NSEvent*)event{
-     [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEMOVED brrMouseButton:BRR_MOUSE_BUTTON_OTHER];
+    [self handleMouseEvent:event brrEvent:BRR_EV_MOUSEMOVED brrMouseButton:BRR_MOUSE_BUTTON_OTHER];
 }
 
 - (void)dealloc
@@ -570,10 +570,14 @@ static void brr_mac_init_keytable(void)
 - (BOOL)isOpaque {
     return YES;
 }
+
 - (BOOL)canBecomeKeyView {
     return YES;
 }
 
+- (BOOL)wantsUpdateLayer{
+    return YES;
+}
 @end
 
 void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){

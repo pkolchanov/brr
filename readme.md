@@ -15,8 +15,8 @@ brr.h is a single-header application wrapper for software rendering apps.
 static int r = 128;
 
 void frame(uint8_t *buffer, int width, int height){
-    // *buffer is a pointer to a frame bitmap in BRGX (Blue, Green, Red, _)
-    // width, height are a bitmap dimentions in pixels
+    // *buffer is a pointer to a frame bitmap in BGRX (Blue, Green, Red, _), 8 bits per color.
+    // width, height are a bitmap dimensions in pixels
 
     int idx = 0;
     while (idx < width * height * BRR_BYTES_PER_PIXEL){

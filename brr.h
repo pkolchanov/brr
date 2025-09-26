@@ -6,14 +6,17 @@
 extern "C" {
 #endif
 
+// Constants
 enum{
     BRR_BYTES_PER_PIXEL = 4,
     BRR_FPS = 30,
     BRR_MAX_KEYCODES = 512
 };
 
+// Type for pressed modifier keys bit field
 typedef uint32_t brr_event_modifier;
 
+// Bit flags for the brr_event_modifier
 typedef enum brr_event_modifier_flag{
     BRR_MOD_SHIFT = 1 << 1,
     BRR_MOD_CONTROL = 1 << 2,
@@ -24,6 +27,7 @@ typedef enum brr_event_modifier_flag{
     BRR_MOD_MOUSE_MIDDLE = 1 << 7,
 } brr_event_modifier_flag;
 
+// Mouse button for BRR_EV_MOUSEDOWN, BRR_EV_MOUSEUP events
 typedef enum brr_mouse_button{
     BRR_MOUSE_BUTTON_LEFT,
     BRR_MOUSE_BUTTON_RIGHT,
@@ -31,6 +35,7 @@ typedef enum brr_mouse_button{
     BRR_MOUSE_BUTTON_OTHER,
 } brr_mouse_button;
 
+// Event type
 typedef enum brr_event_type{
     BRR_EV_KEYDOWN,
     BRR_EV_KEYUP,
@@ -39,6 +44,7 @@ typedef enum brr_event_type{
     BRR_EV_MOUSEMOVED
 } brr_event_type;
 
+// Keycode for BRR_EV_KEYDOWN, BRR_EV_KEYUP events
 // Source: glfw/include/GLFW/glfw3.h
 typedef enum brr_keycode{
 	BRR_KEY_UNKNOWN           =  0,
@@ -166,17 +172,39 @@ typedef enum brr_keycode{
     BRR_KEY_MENU              = 348
 } brr_keycode;
 
+
+// Event struct passed to event handling callback
 typedef struct brr_event{
-    brr_event_type event_type;
-    brr_keycode keycode;
-    int key_repeat;
-    brr_event_modifier event_modifier;
-    brr_mouse_button mouse_button;
-    float mouse_x;
-    float mouse_y;
+    brr_event_type event_type;      // Event type
+    brr_keycode keycode;            // Keycode for BRR_EV_KEYDOWN, BRR_EV_KEYUP
+    int key_repeat;                 // Repeat flag for BRR_EV_KEYDOWN
+    brr_event_modifier event_modifier; // Pressed modifier keys. Get an individual key using bitwise AND with brr_event_modifier_flag
+    brr_mouse_button mouse_button;  // Mouse button for BRR_EV_MOUSEDOWN, BRR_EV_MOUSEUP
+    float mouse_x;                  // Mouse X in pixels for BRR_EV_MOUSEDOWN, BRR_EV_MOUSEUP, BRR_EV_MOUSEMOVED 
+    float mouse_y;                  // Mouse Y in pixels for BRR_EV_MOUSEDOWN, BRR_EV_MOUSEUP, BRR_EV_MOUSEMOVED
 } brr_event;
 
-typedef struct brr_app_t {
+// Entry point for an app
+void brr_start(const char* window_name,                 // Window name
+                int initial_width,                      // Initial width in pixels
+                int initial_height,                     // Initial height in pixels
+                void (*frame_cb)(uint8_t *, int, int),  // Frame drawing callback
+                                                        // *buffer is a pointer to a frame bitmap in BGRX (Blue, Green, Red, _)
+                                                        // width, height are a bitmap dimensions in pixels
+                void (*event_cb)(brr_event *)           // Event handling callback. 
+);
+
+#ifdef __cplusplus
+} // extern "C" {
+#endif
+#endif
+
+// ---------------------------------------------------------------------------------
+#ifdef BRR_IMPLEMENTATION
+#include <stdio.h>  // printf
+#include <string.h> // memset
+
+typedef struct brr_app_t{
     void (*frame_cb)(uint8_t *, int, int);
     void (*event_cb)(brr_event*);
     int width;
@@ -185,18 +213,6 @@ typedef struct brr_app_t {
     const char *window_name;
     brr_event event;
 } brr_app_t;
-
-void brr_start(const char* window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *));
-
-#ifdef __cplusplus
-} // extern "C" {
-#endif
-#endif
-
-
-#ifdef BRR_IMPLEMENTATION
-#include <stdio.h>  // printf
-#include <string.h> // memset
 
 static brr_app_t brr_app;
 

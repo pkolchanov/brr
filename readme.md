@@ -1,8 +1,8 @@
 # brr.h
 
 brr.h is a single-header application wrapper for software rendering apps. 
-* No dependencies on 3D graphics APIs such as OpenGL or DirectX.
-* A minimal API with callbacks for frame rendering and event handling.
+* Creates a window and provides an API for frame rendering and event handling.
+* Has no dependencies on 3D graphics APIs such as OpenGL or DirectX.
 * Supports macOS (Core Graphics), Linux (x11), and Windows (GDI). 
 
 

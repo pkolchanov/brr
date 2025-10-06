@@ -29,15 +29,17 @@ void frame(uint8_t *buffer, int width, int height){
 }
 
 void event(brr_event *event){
-    switch (event->keycode) {
-        case BRR_KEY_UP:
-            r += 3;
-            break;
-        case BRR_KEY_DOWN:
-            r -= 3;
-            break;
-        default:
-            break;
+    if (event->event_type == BRR_EV_KEYDOWN){
+        switch (event->keycode) {
+            case BRR_KEY_RIGHT:
+                r += 3;
+                break;
+            case BRR_KEY_LEFT:
+                r -= 3;
+                break;
+            default:
+                break;
+        }
     }
 }
 

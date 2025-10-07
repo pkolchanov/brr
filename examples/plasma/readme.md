@@ -1,4 +1,4 @@
-![brr plasms](./plasma.png)
+<img src="./plasma.png" width="320" />
 # brr.h plasma
 A classic demoscene–style plasma effect for brr.h
 

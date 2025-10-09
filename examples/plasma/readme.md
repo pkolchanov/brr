@@ -1,6 +1,6 @@
 <img src="./plasma.png" width="320" />
 
-# brr.h plasma
+# brr plasma
 A classic demoscene–style plasma effect for brr.h
 
 #### Build 

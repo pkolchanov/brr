@@ -263,15 +263,15 @@ static const uint8_t font_kc853[2048] = {
 
 #define MICROTEXT_MAXSIZE 512*512
 
-typedef struct microtext_surfacce{
+typedef struct microtext_surface{
     int width;
     int height;
     uint8_t buffer[MICROTEXT_MAXSIZE];
     int char_idx;
     int line_idx;
-}microtext_surfacce;
+}microtext_surface;
 
-int microtext_init_surface(microtext_surfacce *surface, int width, int height){
+int microtext_init_surface(microtext_surface *surface, int width, int height){
     if (width * height >= MICROTEXT_MAXSIZE){
         return 0;
     }
@@ -283,13 +283,13 @@ int microtext_init_surface(microtext_surfacce *surface, int width, int height){
     return 1;
 }
 
-void microtext_clear_surface(microtext_surfacce *surface){
+void microtext_clear_surface(microtext_surface *surface){
     memset(surface->buffer, 0, sizeof(uint8_t) * surface->width * surface->height);
     surface->char_idx = 0;
     surface->line_idx = 0;
 }
 
-void microtext_put_char(microtext_surfacce *surface, char c){
+void microtext_put_char(microtext_surface *surface, char c){
     if (c == '\n'){
         surface->line_idx += 1;
         surface->char_idx = 0;
@@ -317,7 +317,7 @@ void microtext_put_char(microtext_surfacce *surface, char c){
     surface->char_idx += 1;
 }
 
-void microtext_put_text(microtext_surfacce *surface, char *t){
+void microtext_put_text(microtext_surface *surface, char *t){
     for (char *c=t; *c != '\0'; c++){
         microtext_put_char(surface, *c);
     }

@@ -2,7 +2,7 @@
 #include "../../brr.h"
 #include "../../utils/microtext.h"
 
-microtext_surfacce surface;
+microtext_surface surface;
 
 void frame(uint8_t *buffer, int width, int height){
     microtext_clear_surface(&surface);
@@ -10,7 +10,6 @@ void frame(uint8_t *buffer, int width, int height){
     microtext_put_text(&surface, "Yea rulez");
     for(int y = 0; y < height; y++){
         for(int  x = 0; x < width; x++){
-            // float scale = 2.0;
             int src_x = x *  surface.width / width;
             int src_y = y *  surface.height / height ;
             int src_idx = src_y * surface.width + src_x;

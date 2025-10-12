@@ -30,7 +30,7 @@ void frame(uint8_t *buffer, int width, int height){
 
 void event(brr_event *event){
     if (event->event_type == BRR_EV_KEYDOWN){
-        switch (event->keycode) {
+        switch (event->keycode){
             case BRR_KEY_RIGHT:
                 r += 3;
                 break;
@@ -43,7 +43,7 @@ void event(brr_event *event){
     }
 }
 
-int main(int argc, const char * argv[]) {
+int main(int argc, const char * argv[]){
     brr_start("hi brr", 320, 200, frame, event);
 }
 

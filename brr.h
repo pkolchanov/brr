@@ -258,6 +258,11 @@ static brr_keycode brr_get_keycode(int scancode){
 
 #if defined(__APPLE__)
 #import <Cocoa/Cocoa.h>
+typedef struct brr_mac_state_t{
+    int is_running;
+} brr_mac_state_t;
+
+static brr_mac_state_t brr_mac_state;
 
 static void brr_mac_init_keytable(void)
 {
@@ -415,9 +420,21 @@ static void brr_mac_init_keytable(void)
     return YES;
 }
 
-- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
-    return YES;
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
+    brr_mac_state.is_running = 0;
+    NSEvent *poke = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
+                                        location:NSZeroPoint
+                                    modifierFlags:0
+                                        timestamp:0
+                                    windowNumber:0
+                                            context:nil
+                                            subtype:0
+                                            data1:0
+                                            data2:0];
+    [NSApp postEvent:poke atStart:YES]; 
+    return NSTerminateCancel;
 }
+
 @end
 
 @implementation BrrView
@@ -600,11 +617,36 @@ static void brr_mac_init_keytable(void)
 void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
     brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb);
     brr_mac_init_keytable();
+    brr_mac_state.is_running = 1;
     NSApplication *app = [NSApplication sharedApplication];
     BrrAppDelegate *delegate = [[BrrAppDelegate alloc] init];
     [app setDelegate:delegate];
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    [app run];
+    [app setActivationPolicy:NSApplicationActivationPolicyRegular];
+    
+    NSMenu *bar = [[NSMenu alloc] init];
+    NSMenuItem *appMenuItem =
+    [bar addItemWithTitle:@"" action:NULL keyEquivalent:@""];
+    [NSApp setMainMenu:bar];
+    NSMenu *appMenu = [[NSMenu alloc] init];
+    [appMenuItem setSubmenu:appMenu];
+    [appMenu addItemWithTitle:[NSString stringWithFormat:@"Quit %@", [NSString stringWithUTF8String:brr_app.window_name]]
+                    action:@selector(terminate:)
+            keyEquivalent:@"q"];
+    [app finishLaunching];
+
+    while (brr_mac_state.is_running){
+        @autoreleasepool {
+            NSEvent *event = [app nextEventMatchingMask:NSEventMaskAny
+                                            untilDate:[NSDate distantFuture]
+                                                inMode:NSDefaultRunLoopMode
+                                                dequeue:YES];                         
+            if (event){
+                [app sendEvent:event];
+            };
+            [app updateWindows];
+        }
+    }
+  
 }
 
 // --------------------------------------------------------------------------------

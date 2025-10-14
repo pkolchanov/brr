@@ -258,6 +258,12 @@ static brr_keycode brr_get_keycode(int scancode){
 
 #if defined(__APPLE__)
 #import <Cocoa/Cocoa.h>
+typedef struct brr_mac_state_t{
+    int is_running;
+} brr_mac_state_t;
+
+static brr_mac_state_t brr_mac_state;
+
 static void brr_mac_init_keytable(void)
 {
     brr_app.keycodes[0x1D] = BRR_KEY_0;
@@ -379,7 +385,6 @@ static void brr_mac_init_keytable(void)
 @interface BrrAppDelegate : NSObject <NSApplicationDelegate>{
     NSWindow *window;
 }
-@property BOOL isRunning;
 @end
 
 @interface BrrView : NSView{
@@ -389,9 +394,6 @@ static void brr_mac_init_keytable(void)
     uint8_t *buffer;
 }
 @property (strong) NSTimer *timer;
-@end
-
-@interface BrrWindowDelegate:NSObject<NSWindowDelegate>
 @end
 
 @implementation BrrAppDelegate
@@ -404,12 +406,10 @@ static void brr_mac_init_keytable(void)
                                                     NSWindowStyleMaskResizable)
                                            backing:NSBackingStoreBuffered
                                              defer:NO];
-    BrrWindowDelegate *windowDelegate = [[BrrWindowDelegate alloc] init];
-    [window setDelegate:windowDelegate];
     [window setAcceptsMouseMovedEvents:YES];
     BrrView *view = [[BrrView alloc] initWithFrame:[[window contentView] bounds]];
     [view setWantsLayer:YES];
-    [view setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+    view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [window setContentView:view];
     [window setTitle:windowName];
     [window makeKeyAndOrderFront:nil];
@@ -421,28 +421,20 @@ static void brr_mac_init_keytable(void)
 }
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
-    _isRunning = NO;
+    brr_mac_state.is_running = 0;
     NSEvent *poke = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
                                         location:NSZeroPoint
-                                        modifierFlags:0
+                                    modifierFlags:0
                                         timestamp:0
-                                        windowNumber:0
-                                        context:nil
-                                        subtype:0
-                                        data1:0
-                                        data2:0];
+                                    windowNumber:0
+                                            context:nil
+                                            subtype:0
+                                            data1:0
+                                            data2:0];
     [NSApp postEvent:poke atStart:YES]; 
     return NSTerminateCancel;
 }
 
-@end
-
-@implementation BrrWindowDelegate
-- (void)windowWillClose:(NSNotification *)notification {
-    if ([[NSApp windows] count] == 1){ 
-        [NSApp terminate:nil];
-    }
-}
 @end
 
 @implementation BrrView
@@ -625,9 +617,9 @@ static void brr_mac_init_keytable(void)
 void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
     brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb);
     brr_mac_init_keytable();
+    brr_mac_state.is_running = 1;
     NSApplication *app = [NSApplication sharedApplication];
     BrrAppDelegate *delegate = [[BrrAppDelegate alloc] init];
-    [delegate setIsRunning:YES];
     [app setDelegate:delegate];
     [app setActivationPolicy:NSApplicationActivationPolicyRegular];
     
@@ -642,7 +634,7 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
             keyEquivalent:@"q"];
     [app finishLaunching];
 
-    while ([delegate isRunning]){
+    while (brr_mac_state.is_running){
         @autoreleasepool {
             NSEvent *event = [app nextEventMatchingMask:NSEventMaskAny
                                             untilDate:[NSDate distantFuture]

@@ -44,7 +44,7 @@ void event(brr_event *event){
 }
 
 int main(int argc, const char * argv[]){
-    brr_start("hi brr", 320, 200, frame, event);
+    brr_start("hi brr", 320, 200, frame, event, NULL);
 }
 
 ```

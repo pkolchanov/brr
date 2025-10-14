@@ -189,9 +189,10 @@ void brr_start(const char* window_name,                 // Window name
                 int initial_width,                      // Initial width in pixels
                 int initial_height,                     // Initial height in pixels
                 void (*frame_cb)(uint8_t *, int, int),  // Frame drawing callback
-                                                        // *buffer is a pointer to a frame bitmap in BGRX (Blue, Green, Red, _)
-                                                        // width, height are a bitmap dimensions in pixels
-                void (*event_cb)(brr_event *)           // Event handling callback. 
+                                                        //     *buffer is a pointer to a frame bitmap in BGRX (Blue, Green, Red, _)
+                                                        //     width, height are a bitmap dimensions in pixels
+                void (*event_cb)(brr_event *),          // Event handling callback
+                void (*cleanup_cb)()                    // Cleanup callback
 );
 
 #ifdef __cplusplus
@@ -207,6 +208,7 @@ void brr_start(const char* window_name,                 // Window name
 typedef struct brr_app_t{
     void (*frame_cb)(uint8_t *, int, int);
     void (*event_cb)(brr_event*);
+    void (*cleanup_cb)();
     int width;
     int height;
     brr_keycode keycodes[BRR_MAX_KEYCODES];
@@ -216,11 +218,12 @@ typedef struct brr_app_t{
 
 static brr_app_t brr_app;
 
-static void brr_init_app(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *)){
+static void brr_init_app(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event *), void (*cleanup_cb)()){
     brr_app.width = initial_width;
     brr_app.height = initial_height;
     brr_app.frame_cb = frame_cb;
     brr_app.event_cb = event_cb;
+    brr_app.cleanup_cb = cleanup_cb;
     brr_app.window_name = window_name;
     memset(brr_app.keycodes, BRR_KEY_UNKNOWN, sizeof(brr_app.keycodes));
     memset(&brr_app.event, 0, sizeof(brr_event));
@@ -418,6 +421,12 @@ static void brr_mac_init_keytable(void)
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
     return YES;
 }
+
+- (void)applicationWillTerminate:(NSNotification *)notification{
+    if (brr_app.cleanup_cb){
+        brr_app.cleanup_cb();
+    }
+}
 @end
 
 @implementation BrrView
@@ -597,8 +606,8 @@ static void brr_mac_init_keytable(void)
 }
 @end
 
-void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
-    brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb);
+void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*), void (*cleanup_cb)()){
+    brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb, cleanup_cb);
     brr_mac_init_keytable();
     NSApplication *app = [NSApplication sharedApplication];
     BrrAppDelegate *delegate = [[BrrAppDelegate alloc] init];
@@ -1252,8 +1261,8 @@ static void brr_x11_init_keytable(void)
     XFree(keysyms);
 }
 
-void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
-    brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb);
+void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*), void (*cleanup_cb)()){
+    brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb, cleanup_cb);
 	brr_x11_setup();
     brr_x11_init_keytable();
     brr_x11_alloc_image();
@@ -1289,6 +1298,9 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
     brr_x11_dealloc_image();
     XFreeGC(brr_x11_state.display, brr_x11_state.gc);
     XCloseDisplay(brr_x11_state.display);
+    if (brr_app.cleanup_cb){
+        brr_app.cleanup_cb();
+    }
 }
 
 // --------------------------------------------------------------------------------
@@ -1621,8 +1633,8 @@ static void brr_windows_framelock(){
     QueryPerformanceCounter(&brr_windows_state.last_timestamp);
 }
 
-void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*)){
-    brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb);
+void brr_start(const char *window_name, int initial_width, int initial_height, void (*frame_cb)(uint8_t *, int, int), void (*event_cb)(brr_event*), void (*cleanup_cb)()){
+    brr_init_app(window_name, initial_width, initial_height, frame_cb, event_cb, cleanup_cb);
 	brr_windows_init_keytable();
     brr_windows_setup();
     brr_windows_create_window();
@@ -1652,6 +1664,9 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
     brr_windows_destroy_window();
     brr_windows_free_buffer();
     free(brr_windows_state.window_name_wide);
+    if (brr_app.cleanup_cb){
+        brr_app.cleanup_cb();
+    }
 }
 
 #endif

@@ -24,5 +24,5 @@ void frame(uint8_t *buffer, int width, int height){
 
 int main(int argc, const char * argv[]) {
     microtext_init_surface(&surface, 320, 200);
-    brr_start("brr microtext", 320, 200, frame, NULL);
+    brr_start("brr microtext", 320, 200, frame, NULL, NULL);
 }

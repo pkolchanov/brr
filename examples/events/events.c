@@ -236,5 +236,5 @@ void event(brr_event *event){
 int main(int argc, const char * argv[]) {
     memset(&last_event, 0, sizeof(brr_event));
     microtext_init_surface(&surface, 320, 200);
-    brr_start("brr events", 320, 200, frame, event);
+    brr_start("brr events", 320, 200, frame, event, NULL);
 }

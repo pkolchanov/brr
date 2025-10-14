@@ -37,5 +37,5 @@ void frame(uint8_t *buffer, int width, int height){
 }
 
 int main(int argc, const char * argv[]) {
-    brr_start("brr plasma", 320, 200, frame, NULL);
+    brr_start("brr plasma", 320, 200, frame, NULL, NULL);
 }

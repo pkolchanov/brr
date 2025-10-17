@@ -72,4 +72,4 @@ gcc main.c -mwindows -o main.exe && ./main.exe
 | [events](/examples/events/readme.md) | An events inspector |
 | [microtext](/examples/microtext/readme.md) | A simple text renderer |
 | [cairo](/examples/cairo/readme.md) | A cairo graphics vector shape rendering |
-| [DOOM](/examples/doom/readme.md) | A DOOM port using brr.h, based on doomgeneric by ozkl |
+| [DOOM](/examples/doom/readme.md) | A DOOM port based on doomgeneric by ozkl |

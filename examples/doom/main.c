@@ -197,7 +197,7 @@ void event(brr_event *event){
     }
 }
 
-int main(int argc, const char *argv[]){
+int main(int argc, char *argv[]){
     doomgeneric_Create(argc, argv);
-    brr_start("brr doom", 320, 200, frame, event, NULL);
+    brr_start("brr doom", DOOMGENERIC_RESX, DOOMGENERIC_RESY, frame, event, NULL);
 }

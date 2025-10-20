@@ -69,6 +69,7 @@ gcc main.c -mwindows -o main.exe && ./main.exe
 | Example | Description |
 | --- | --- |
 | [plasma](/examples/plasma/readme.md) | A classic demoscene–style plasma effect |
+| [fire](/examples/fire/readme.md) | A classic demoscene–style fire effect |
 | [events](/examples/events/readme.md) | An events inspector |
 | [microtext](/examples/microtext/readme.md) | A simple text renderer |
 | [cairo](/examples/cairo/readme.md) | A cairo graphics vector shape rendering |

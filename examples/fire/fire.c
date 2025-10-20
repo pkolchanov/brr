@@ -131,6 +131,6 @@ int main(void) {
   const int win_w = 960;
   const int win_h = 200;
 
-  brr_start("brr fire", win_w, win_h, frame, NULL, NULL);
+  brr_start("brr fire", 320, 200, frame, NULL, NULL);
   return 0;
 }

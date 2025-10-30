@@ -1,3 +1,5 @@
 .DS_Store
 fire
-plasma
+!plasma/
+snake
+!snake/

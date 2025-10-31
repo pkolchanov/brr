@@ -613,6 +613,16 @@ void brr_start(const char *window_name, int initial_width, int initial_height, v
     BrrAppDelegate *delegate = [[BrrAppDelegate alloc] init];
     [app setDelegate:delegate];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+    NSMenu *bar = [[NSMenu alloc] init];
+    NSMenuItem *appMenuItem =
+    [bar addItemWithTitle:@"" action:NULL keyEquivalent:@""];
+    [NSApp setMainMenu:bar];
+    NSMenu *appMenu = [[NSMenu alloc] init];
+    [appMenuItem setSubmenu:appMenu];
+    [appMenu addItemWithTitle:[NSString stringWithFormat:@"Quit %@", [NSString stringWithUTF8String:brr_app.window_name]]
+                    action:@selector(terminate:)
+            keyEquivalent:@"q"];
     [app run];
 }
 

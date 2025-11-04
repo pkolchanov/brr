@@ -1,6 +1,10 @@
 #include <stdint.h> // uint8_t
 #include <string.h> // memset
 
+#define MICROTEXT_CHAR_WIDTH 8
+#define MICROTEXT_CHAR_HEIGHT 8
+#define MICROTEXT_MAXSIZE 512*512
+
 // Source: sokol/util/sokol_debugtext.h
 static const uint8_t font_kc853[2048] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x81, 0xFF, // 00
@@ -261,7 +265,7 @@ static const uint8_t font_kc853[2048] = {
     0x00, 0x7E, 0x7E, 0x7E, 0x7E, 0x7E, 0x7E, 0x00, // FF
 };
 
-#define MICROTEXT_MAXSIZE 512*512
+
 
 typedef struct microtext_surface{
     int width;

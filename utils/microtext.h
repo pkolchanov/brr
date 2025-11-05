@@ -266,7 +266,6 @@ static const uint8_t font_kc853[2048] = {
 };
 
 
-
 typedef struct microtext_surface{
     int width;
     int height;
@@ -300,13 +299,13 @@ void microtext_put_char(microtext_surface *surface, char c){
         return;
     }
     uint8_t c_u8 = (uint8_t)c;
-    int font_idx = c_u8 * 8;
-    for (int row = 0; row < 8; row++){
+    int font_idx = c_u8 * MICROTEXT_CHAR_HEIGHT;
+    for (int row = 0; row < MICROTEXT_CHAR_HEIGHT; row++){
         uint8_t lint = font_kc853[font_idx + row];
         
-        for (int bit = 7; bit >= 0; bit--) {
+        for (int bit = MICROTEXT_CHAR_WIDTH - 1; bit >= 0; bit--) {
             uint8_t val = (lint & (1 << bit)) ? 255 : 0;
-            int x = 8 * surface->char_idx + (7 - bit);
+            int x = 8 * surface->char_idx + (MICROTEXT_CHAR_WIDTH - 1 - bit);
             int y = 8 * surface->line_idx + row;
             if (x >= surface->width || y >= surface->height){
                 continue;

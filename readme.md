@@ -72,5 +72,6 @@ gcc main.c -mwindows -o main.exe && ./main.exe
 | [fire](/examples/fire/readme.md) | A classic demoscene–style fire effect |
 | [events](/examples/events/readme.md) | An events inspector |
 | [microtext](/examples/microtext/readme.md) | A simple text renderer |
+| [microui](/examples/microui/readme.md) | A demo of microui ui library  |
 | [cairo](/examples/cairo/readme.md) | A cairo graphics vector shape rendering |
 | [DOOM](/examples/doom/readme.md) | A DOOM port based on doomgeneric by ozkl |
